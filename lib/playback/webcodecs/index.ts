@@ -47,12 +47,13 @@ export default class Player {
 
 		const msg: Message.Config = {}
 
-		// Only configure audio is we have an audio track
+		// Only configure audio if we have an audio track
 		if (sampleRate && channels) {
 			msg.audio = {
 				channels: channels,
 				sampleRate: sampleRate,
 				ring: new RingShared(2, sampleRate / 20), // 50ms
+				context: this.#context as AudioContext | undefined,
 			}
 
 			this.#context = new Context(msg.audio)

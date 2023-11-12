@@ -11,7 +11,6 @@ interface FrameCopyToOptions {
 	frameOffset?: number
 	planeIndex: number
 }
-
 // This is implemented by AudioData in WebCodecs, but we don't import it because it's a DOM type.
 interface Frame {
 	numberOfFrames: number

@@ -10,6 +10,7 @@ export interface Header {
 	priority: number // VarInt with a u32 maximum value
 	expires?: number // optional: expiration in seconds
 	size?: number // optional: size of payload, otherwise it continues until end of stream
+	timestamp?: number // optional: timestamp for latency value
 }
 
 export class Objects {
@@ -20,27 +21,43 @@ export class Objects {
 	}
 
 	async send(header: Header): Promise<WritableStream<Uint8Array>> {
-		//console.debug("sending object: ", header)
-		const stream = await this.quic.createUnidirectionalStream()
-		await this.#encode(stream, header)
+		const stream = await this.quic.createUnidirectionalStream() //creates a new quic stream
+		header.timestamp = Date.now()
+		await this.#encode(stream, header) //writes object inside stream
+		console.log("sent object: ", header) //object sent log
 		return stream
 	}
 
 	async recv(): Promise<{ stream: ReadableStream<Uint8Array>; header: Header } | undefined> {
-		const streams = this.quic.incomingUnidirectionalStreams.getReader()
+		const streams = this.quic.incomingUnidirectionalStreams.getReader() //allows to access incoming quic streams
 
-		const { value, done } = await streams.read()
+		const { value, done } = await streams.read() //reads all incoming streams one at a time
 		streams.releaseLock()
 
 		if (done) return
 		const stream = value
 
-		const header = await this.#decode(stream)
+		const header = await this.#decode(stream) //extracts data from a single stream
 		if (header.size) {
-			throw new Error("TODO: handle OBJECT with size")
+			//throw new Error("TODO: handle OBJECT with size")
 		}
-
-		//console.debug("received object: ", header)
+		console.log("received object: ", header) //object received log
+		if (header.timestamp) {
+			// if object timestamp is present, calculate and print latency
+			const latency = Date.now() - header.timestamp
+			console.log("Latency for object ", header.object, "of group", header.group, ":", latency, "ms")
+			/*fileLogLine(
+				"Latency for object " +
+					header.object +
+					" of group " +
+					header.group +
+					" of track " +
+					header.track +
+					" : " +
+					latency +
+					" ms",
+			)*/
+		}
 		return { header, stream }
 	}
 
@@ -53,7 +70,7 @@ export class Objects {
 		}
 
 		const has_size = type === 2
-
+		const ts_enabled = true
 		return {
 			track: await r.u62(),
 			group: await r.u53(),
@@ -61,6 +78,7 @@ export class Objects {
 			priority: await r.u53(),
 			expires: (await r.u53()) || undefined,
 			size: has_size ? await r.u53() : undefined,
+			timestamp: ts_enabled ? await r.u53() : undefined,
 		}
 	}
 
@@ -73,5 +91,6 @@ export class Objects {
 		await w.u53(h.priority)
 		await w.u53(h.expires ?? 0)
 		if (h.size) await w.u53(h.size)
+		if (h.timestamp) await w.u53(h.timestamp)
 	}
 }

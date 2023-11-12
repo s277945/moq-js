@@ -4,12 +4,16 @@
 	"private": true,
 	"workspaces": [
 		"lib",
+		"logger",
 		"web"
 	],
 	"scripts": {
-		"dev": "npm run dev --workspace web",
+		"dev": "concurrently \"npm run dev --workspace=logger\" \"npm run dev --workspace=web\"",
 		"build": "npm run build --workspaces",
 		"lint": "npm run lint --workspaces",
 		"fmt": "npm run fmt --workspaces"
+	},
+	"dependencies": {
+		"concurrently": "^8.2.2"
 	}
 }

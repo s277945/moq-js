@@ -1,0 +1,24 @@
+{
+	"name": "logger",
+	"version": "0.0.1",
+	"description": "logger server",
+	"main": "dist/server.js",
+	"scripts": {
+		"start": "node dist/server.js",
+		"dev": "npx tsc && node dist/server.js",
+		"build": "npx tsc",
+		"lint": "eslint .",
+		"fmt": "prettier --write ."
+	},
+	"author": "Alessandro Bottisio",
+	"license": "GPL-3.0-or-later",
+	"devDependencies": {
+		"@types/express": "^4.17.1",
+		"@types/node": "^20.9.0",
+		"typescript": "^5.2.2"
+	},
+	"dependencies": {
+		"express": "^4.17.1",
+		"path": "^0.12.7"
+	}
+}

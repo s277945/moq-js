@@ -20,7 +20,6 @@ export class Encoder {
 			flush: this.#flush.bind(this),
 		})
 	}
-
 	#start(controller: TransformStreamDefaultController<AudioDecoderConfig | EncodedAudioChunk>) {
 		this.#encoder = new AudioEncoder({
 			output: (frame, metadata) => {

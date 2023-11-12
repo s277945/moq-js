@@ -193,10 +193,10 @@ export class Broadcast {
 		// Send a SUBSCRIBE_OK
 		await subscriber.ack()
 
-		const segments = track.segments().getReader()
+		const segments = track.segments().getReader() //allows to read the track segments
 
 		for (;;) {
-			const { value: segment, done } = await segments.read()
+			const { value: segment, done } = await segments.read() //read each segment from the track
 			if (done) break
 
 			// Serve the segment and log any errors that occur.

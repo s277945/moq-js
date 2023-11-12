@@ -24,10 +24,10 @@ class Worker {
 		if (msg.config) {
 			this.#onConfig(msg.config)
 		} else if (msg.init) {
-			// TODO buffer the init segmnet so we don't hold the stream open.
+			// TODO buffer the init segment so we don't hold the stream open.
 			this.#onInit(msg.init)
 		} else if (msg.segment) {
-			const segment = msg.segment
+			const segment = msg.segment //received segment
 			this.#onSegment(segment).catch(async (e) => {
 				// Cancel the stream so we don't hold it open.
 				const err = asError(e)

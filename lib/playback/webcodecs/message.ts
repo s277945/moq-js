@@ -9,7 +9,7 @@ export interface Config {
 export interface ConfigAudio {
 	channels: number
 	sampleRate: number
-
+	context: AudioContext | undefined
 	ring: RingShared
 }
 
