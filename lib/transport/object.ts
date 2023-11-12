@@ -1,5 +1,5 @@
 import { Reader, Writer } from "./stream"
-import { postLogString } from "../common/logger"
+import { postLogStringAndForget, postLogStringAwait } from "../common/logger"
 export { Reader, Writer }
 
 // This is OBJECT but we can't use that name because it's a reserved word.
@@ -47,7 +47,7 @@ export class Objects {
 			// if object timestamp is present, calculate and print latency
 			const latency = Date.now() - header.timestamp
 			console.log("Latency for object ", header.object, "of group", header.group, ":", latency, "ms")
-			postLogString(
+			postLogStringAndForget(
 				"Latency for object " +
 					header.object +
 					" of group " +

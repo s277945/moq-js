@@ -15,11 +15,11 @@ module.exports = {
 		es2022: true,
 		worker: true,
 	},
-	ignorePatterns: ["dist", "node_modules", ".eslintrc.cjs", "common/logger.ts"],
+	ignorePatterns: ["dist", "node_modules", ".eslintrc.cjs"],
 	rules: {
 		// Allow the ! operator because typescript can't always figure out when something is not undefined
 		"@typescript-eslint/no-non-null-assertion": "off",
-
+		"@typescript-eslint/no-floating-promises": "off",
 		// Allow `any` because Javascript was not designed to be type safe.
 		"@typescript-eslint/no-explicit-any": "off",
 
@@ -53,4 +53,4 @@ module.exports = {
 		project: true,
 		tsconfigRootDir: __dirname,
 	},
-}
+};

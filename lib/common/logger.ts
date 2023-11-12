@@ -1,4 +1,13 @@
-export async function postLogString(data: string): Promise<void> {
+export function postLogStringAndForget(data: string): void {
+	fetch("http://localhost:3000/latency-data", {
+		method: "POST",
+		body: JSON.stringify({ str: data }),
+		headers: { "Content-Type": "application/json" },
+	})
+	return
+}
+
+export async function postLogStringAwait(data: string): Promise<void> {
 	const response = await fetch("http://localhost:3000/latency-data", {
 		method: "POST",
 		body: JSON.stringify({ str: data }),
