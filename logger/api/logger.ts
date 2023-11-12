@@ -16,11 +16,12 @@ export function fileLog(data: any, fileName?: string) {
 	logger = loggers.get(fname);
 
 	// if not present create one and add it
-	if (!logger) logger = createLogger(fname);
-
-	// if filename is invalid return
-	if (logger) loggers.set(fname, logger);
-	else return;
+	if (!logger) {
+		logger = createLogger(fname);
+		// if filename is invalid return
+		if (logger) loggers.set(fname, logger);
+		else return;
+	}
 
 	// write data to log file
 	logger?.write(data);
