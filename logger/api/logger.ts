@@ -27,7 +27,6 @@ export function fileLog(data: any, fileName?: string) {
 }
 
 export function fileLogLine(line: string, fileName?: string) {
-	console.log(dirname(dirname(dirname(__dirname))));
 	fileLog(line + "\n", fileName);
 }
 
@@ -53,7 +52,7 @@ class Logger {
 
 	constructor(fname: string) {
 		this.filename = fname;
-		writeFileSync(join(dirname(dirname(dirname(__dirname))), this.filename), "Log data: \n\n", {
+		writeFileSync(join(dirname(dirname(dirname(__dirname))), this.filename), "", {
 			flag: "w",
 		});
 	}

@@ -13,11 +13,13 @@
 	"author": "Alessandro Bottisio",
 	"license": "GPL-3.0-or-later",
 	"devDependencies": {
+		"@types/cors": "^2.8.16",
 		"@types/express": "^4.17.1",
 		"@types/node": "^20.9.0",
 		"typescript": "^5.2.2"
 	},
 	"dependencies": {
+		"cors": "^2.8.5",
 		"express": "^4.17.1",
 		"path": "^0.12.7"
 	}
