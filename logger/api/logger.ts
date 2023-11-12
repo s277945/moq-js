@@ -53,13 +53,13 @@ class Logger {
 
 	constructor(fname: string) {
 		this.filename = fname;
-		writeFileSync(join(dirname(dirname(dirname(__dirname))), this.filename), "", {
+		writeFileSync(join(join(dirname(dirname(dirname(__dirname))), "logs"), this.filename), "", {
 			flag: "w",
 		});
 	}
 
 	public write(data: any) {
-		appendFileSync(join(dirname(dirname(dirname(__dirname))), this.filename), data);
+		appendFileSync(join(join(dirname(dirname(dirname(__dirname))), "logs"), this.filename), data);
 	}
 
 	public getFileName() {
