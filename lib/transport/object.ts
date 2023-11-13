@@ -47,10 +47,11 @@ export class Objects {
 			// if object timestamp is present, calculate and print latency
 			const latency = Date.now() - header.timestamp
 			console.log("Latency for object ", header.object, "of group", header.group, ":", latency, "ms")
+			// send latency data to logger server
 			postLogDataAndForget({
 				object: header.object,
 				group: header.group,
-				track: BigInt(header.track).toString(),
+				track: BigInt(header.track).toString(), // converted to string because bigint is not natively supported in JSON
 				latency: latency,
 			})
 		}

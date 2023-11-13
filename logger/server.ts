@@ -27,8 +27,10 @@ app.post("/latency-data", (req, res) => {
 		dest.track != undefined &&
 		dest.latency != undefined
 	) {
+		// create log string
 		const str = dest.track + " " + dest.group + " " + dest.object + " " + dest.latency;
-		fileLogLine(str); // log telemetry data to file
+		fileLogLine(str); // log telemetry string to file
+		// log telemetry data to console
 		console.log(
 			"Latency for object " +
 				dest.object +
@@ -39,8 +41,8 @@ app.post("/latency-data", (req, res) => {
 				" : " +
 				dest.latency +
 				" ms",
-		); // log raw telemetry data to console
-	} else console.log("Unexpected data format :", req.body); // log raw telemetry data to console
+		);
+	} else console.log("Unexpected data format :", req.body); // log raw data to console if unexpected format
 	res.send("Received POST request for telemetry data");
 });
 //POST response for localhost:/latency-string
