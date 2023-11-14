@@ -48,12 +48,14 @@ export class Objects {
 			const latency = Date.now() - header.timestamp
 			console.log("Latency for object ", header.object, "of group", header.group, ":", latency, "ms")
 			// send latency data to logger server
-			postLogDataAndForget({
-				object: header.object,
-				group: header.group,
-				track: BigInt(header.track).toString(), // converted to string because bigint is not natively supported in JSON
-				latency: latency,
-			})
+			if (latency <= 500)
+				// maximum object latency to log, objects with higher latency are ignored
+				postLogDataAndForget({
+					object: header.object,
+					group: header.group,
+					track: BigInt(header.track).toString(), // converted to string because bigint is not natively supported in JSON
+					latency: latency,
+				})
 		}
 		return { header, stream }
 	}

@@ -1,5 +1,6 @@
 /* eslint-disable jsx-a11y/media-has-caption */
 import { Player } from "@kixelated/moq/playback"
+import { getLoggerStatus } from "@kixelated/moq/common/logger"
 
 import Fail from "./fail"
 
@@ -41,6 +42,9 @@ export default function Watch(props: { name: string }) {
 		const fingerprint = server.startsWith("localhost") ? `https://${server}/fingerprint` : undefined
 
 		const element = useElement()
+
+		getLoggerStatus() // check logger server status
+
 		Player.create({ url, fingerprint, element }).then(setPlayer).catch(setError)
 	})
 

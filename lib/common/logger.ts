@@ -16,6 +16,28 @@ export interface LogData {
 	latency: number
 }
 
+// function to get logger server status and set max packet latency to log
+// export function initLogger(maxLatency: number): void {
+// 	fetch("http://localhost:3000/latency-setup", {
+// 		method: "POST",
+// 		body: JSON.stringify({ maxLat: maxLatency }),
+// 		headers: { "Content-Type": "application/json" },
+// 	})
+// 		.then((response) => {
+// 			if (!response.ok) {
+// 				console.error("Error on logger server, status:", loggerServerStatus(2))
+// 			} else if (response.status >= 400) {
+// 				console.log("Logger server unreachable" + response.status + " - " + response.statusText)
+// 				console.error("Error on logger server, status:", loggerServerStatus(2))
+// 			} else {
+// 				console.log("Logger server available, status:", loggerServerStatus(1))
+// 			}
+// 		})
+// 		.catch(() => {
+// 			console.log("Logger server unreachable, status:", loggerServerStatus(2))
+// 		})
+// }
+
 // function to get logger server status
 export function getLoggerStatus(): void {
 	fetch("http://localhost:3000/latency-data", {
@@ -46,6 +68,16 @@ export function postLogDataAndForget(data: LogData): void {
 		fetch("http://localhost:3000/latency-data", {
 			method: "POST",
 			body: JSON.stringify(data),
+			headers: { "Content-Type": "application/json" },
+		})
+	return
+}
+// function to signal client player closure to logger
+export function postLogDataEnd(): void {
+	if (loggerServerStatus() == 1)
+		fetch("http://localhost:3000/latency-data-end", {
+			method: "POST",
+			body: JSON.stringify({ playerClosed: true }),
 			headers: { "Content-Type": "application/json" },
 		})
 	return

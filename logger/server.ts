@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import { fileLog, fileLogLine } from "./api/logger";
+import { loggerServerStatus } from "./api/state";
 
 const app = express();
 //enable cors for localhost app
@@ -16,6 +17,14 @@ const port = 3000;
 app.get("/latency-data", (req, res) => {
 	console.log("GET request received from:", req.ip == "::1" ? "localhost" : req.ip);
 	res.send("GET request received, logger available");
+	if (loggerServerStatus() == 0) {
+		fileLogLine("// START //"); // log telemetry string to file when new session starts
+		console.log("// Player session started //");
+		loggerServerStatus(1);
+	} else {
+		fileLogLine("// END //" + "\n" + "// START //"); // log telemetry string to file when new session starts
+		console.log("// Player session ended //" + "\n" + "// Player session started //");
+	}
 });
 //POST response for localhost:/latency-data
 app.post("/latency-data", (req, res) => {
@@ -44,6 +53,15 @@ app.post("/latency-data", (req, res) => {
 		);
 	} else console.log("Unexpected data format :", req.body); // log raw data to console if unexpected format
 	res.send("Received POST request for telemetry data");
+});
+//POST response for localhost:/latency-data-end
+app.post("/latency-data-end", (req, res) => {
+	const dest = req.body;
+	if (dest.playerClosed) {
+		fileLogLine("/n" + "// Player session ended //"); // log data to file
+		console.log("// Player session ended //"); // log data to console
+	} else console.log("Mmmmmmm");
+	res.send("Received POST request for telemetry data session end");
 });
 //POST response for localhost:/latency-string
 app.post("/latency-string", (req, res) => {
