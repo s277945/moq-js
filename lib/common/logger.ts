@@ -8,6 +8,9 @@ function loggerServerStatus(newStatus?: number): number {
 	}
 	return Atomics.load(uint8, 0)
 }
+
+let fileName = "log.txt"
+
 // format for latency data
 export interface LogData {
 	object: number
@@ -58,6 +61,28 @@ export function getLoggerStatus(): void {
 			console.log("Logger server unreachable, status:", loggerServerStatus(2))
 		})
 }
+// function to get logger server status
+export function initLoggerFile(fName?: string): void {
+	fetch("http://localhost:3000/latency-init", {
+		method: "POST",
+		body: fName ? JSON.stringify({ fileName: fName }) : "",
+		headers: { "Content-Type": "application/json" },
+	})
+		.then((response) => {
+			if (!response.ok) {
+				console.error("Error on logger server, status:", loggerServerStatus(2))
+			} else if (response.status >= 400) {
+				console.log("Logger server unreachable" + response.status + " - " + response.statusText)
+				console.error("Error on logger server, status:", loggerServerStatus(2))
+			} else {
+				console.log("Logger server available, status:", loggerServerStatus(1))
+				if (fName) fileName = fName // save logger file name
+			}
+		})
+		.catch(() => {
+			console.log("Logger server unreachable, status:", loggerServerStatus(2))
+		})
+}
 // function to get cached logger server status
 export function getCachedLoggerStatus(): boolean {
 	return loggerServerStatus() == (0 | 2) ? false : true
@@ -67,7 +92,7 @@ export function postLogDataAndForget(data: LogData): void {
 	if (data && loggerServerStatus() == 1)
 		fetch("http://localhost:3000/latency-data", {
 			method: "POST",
-			body: JSON.stringify(data),
+			body: JSON.stringify({ data: data, fileName: fileName }),
 			headers: { "Content-Type": "application/json" },
 		})
 	return

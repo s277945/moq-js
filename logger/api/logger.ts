@@ -4,7 +4,7 @@ import { join, dirname, basename } from "path";
 let loggers: Map<string, Logger>;
 // loggers is a structure that contains all initialized loggers
 
-export function fileLog(data: any, fileName?: string) {
+export function fileLog(data: any, fileName?: string): boolean {
 	//create logger map variable if not already initialized
 	if (!loggers) loggers = new Map<string, Logger>();
 	let logger: Logger | undefined;
@@ -20,15 +20,16 @@ export function fileLog(data: any, fileName?: string) {
 		logger = createLogger(fname);
 		// if filename is invalid return
 		if (logger) loggers.set(fname, logger);
-		else return;
+		else return false;
 	}
 
 	// write data to log file
 	logger?.write(data);
+	return true;
 }
 
-export function fileLogLine(line: string, fileName?: string) {
-	fileLog(line + "\n", fileName);
+export function fileLogLine(line: string, fileName?: string): boolean {
+	return fileLog(line + "\n", fileName);
 }
 
 function createLogger(fname: string): Logger | undefined {

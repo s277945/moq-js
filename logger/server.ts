@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import { fileLog, fileLogLine } from "./api/logger";
-import { loggerServerStatus } from "./api/state";
+import { setFileStatus, getFileStatus } from "./api/file_status";
 
 const app = express();
 //enable cors for localhost app
@@ -17,18 +17,50 @@ const port = 3000;
 app.get("/latency-data", (req, res) => {
 	console.log("GET request received from:", req.ip == "::1" ? "localhost" : req.ip);
 	res.send("GET request received, logger available");
-	if (loggerServerStatus() == 0) {
+	if (!getFileStatus("log.txt")) {
 		fileLogLine("// START //"); // log telemetry string to file when new session starts
 		console.log("// Player session started //");
-		loggerServerStatus(1);
+		setFileStatus("log.txt", 1);
 	} else {
 		fileLogLine("// END //" + "\n" + "// START //"); // log telemetry string to file when new session starts
 		console.log("// Player session ended //" + "\n" + "// Player session started //");
 	}
 });
+
+//POST response for localhost:/latency-init
+app.post("/latency-init", (req, res) => {
+	console.log("POST request received from:", req.ip == "::1" ? "localhost" : req.ip);
+	const body = req.body;
+	if (body && body.fileName) {
+		const fileName = body.fileName;
+		res.send("POST request received, logger available");
+		if (!getFileStatus(fileName)) {
+			// log telemetry string to file when new session starts
+			if (fileLogLine("// START //", fileName)) {
+				console.log("// Player session started //");
+				setFileStatus(fileName, 1);
+			} else console.log("Invalid filename provided");
+		} else {
+			fileLogLine("// END //" + "\n" + "// START //", fileName); // log telemetry string to file when new session starts
+			console.log("// Player session ended //" + "\n" + "// Player session started //");
+		}
+	} else {
+		res.send("POST request received, logger available");
+		if (!getFileStatus("log.txt")) {
+			fileLogLine("// START //"); // log telemetry string to file when new session starts
+			console.log("// Player session started //");
+			setFileStatus("log.txt", 1);
+		} else {
+			fileLogLine("// END //" + "\n" + "// START //"); // log telemetry string to file when new session starts
+			console.log("// Player session ended //" + "\n" + "// Player session started //");
+		}
+	}
+});
+
 //POST response for localhost:/latency-data
 app.post("/latency-data", (req, res) => {
-	const dest = req.body;
+	const dest = req.body.data;
+	const filename = req.body.fileName;
 	if (
 		dest &&
 		dest.object != undefined &&
@@ -38,7 +70,7 @@ app.post("/latency-data", (req, res) => {
 	) {
 		// create log string
 		const str = dest.track + " " + dest.group + " " + dest.object + " " + dest.latency;
-		fileLogLine(str); // log telemetry string to file
+		fileLogLine(str, filename); // log telemetry string to file
 		// log telemetry data to console
 		console.log(
 			"Latency for object " +
@@ -54,6 +86,7 @@ app.post("/latency-data", (req, res) => {
 	} else console.log("Unexpected data format :", req.body); // log raw data to console if unexpected format
 	res.send("Received POST request for telemetry data");
 });
+
 //POST response for localhost:/latency-data-end
 app.post("/latency-data-end", (req, res) => {
 	const dest = req.body;
@@ -63,6 +96,7 @@ app.post("/latency-data-end", (req, res) => {
 	} else console.log("Mmmmmmm");
 	res.send("Received POST request for telemetry data session end");
 });
+
 //POST response for localhost:/latency-string
 app.post("/latency-string", (req, res) => {
 	const dest = req.body;

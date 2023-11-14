@@ -1,6 +1,6 @@
 /* eslint-disable jsx-a11y/media-has-caption */
 import { Player } from "@kixelated/moq/playback"
-import { getLoggerStatus } from "@kixelated/moq/common/logger"
+import { initLoggerFile } from "@kixelated/moq/common/logger"
 
 import Fail from "./fail"
 
@@ -36,6 +36,7 @@ export default function Watch(props: { name: string }) {
 	const [usePlayer, setPlayer] = createSignal<Player | undefined>()
 	createEffect(() => {
 		const url = `https://${server}/${props.name}`
+		const filename = ""
 
 		// Special case localhost to fetch the TLS fingerprint from the server.
 		// TODO remove this when WebTransport correctly supports self-signed certificates
@@ -43,7 +44,7 @@ export default function Watch(props: { name: string }) {
 
 		const element = useElement()
 
-		getLoggerStatus() // check logger server status
+		initLoggerFile(filename) // check logger server status
 
 		Player.create({ url, fingerprint, element }).then(setPlayer).catch(setError)
 	})
