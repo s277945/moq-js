@@ -25,6 +25,12 @@ npm install
 Run the development web server:
 
 ```bash
+npm run start
+```
+
+Or the development web server with the logger server enabled:
+
+```bash
 npm run dev
 ```
 

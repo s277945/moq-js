@@ -3,6 +3,7 @@ import * as Message from "./webcodecs/message"
 import { Connection } from "../transport/connection"
 import { Catalog, isAudioTrack, isMp4Track, Mp4Track } from "../media/catalog"
 import { asError } from "../common/error"
+import { getLoggerStatus } from "../common/logger"
 
 // We support two different playback implementations:
 import Webcodecs from "./webcodecs"
@@ -53,6 +54,7 @@ export class Player {
 		const connection = await client.connect()
 
 		const catalog = await Catalog.fetch(connection)
+		await getLoggerStatus()
 
 		let backend
 

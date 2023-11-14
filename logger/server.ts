@@ -14,8 +14,8 @@ const port = 3000;
 
 //GET response for localhost:/latency-data
 app.get("/latency-data", (req, res) => {
-	console.log(req.body);
-	res.send("Got a GET request");
+	console.log("GET request received from:", req.ip == "::1" ? "localhost" : req.ip);
+	res.send("GET request received, logger available");
 });
 //POST response for localhost:/latency-data
 app.post("/latency-data", (req, res) => {
