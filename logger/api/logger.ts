@@ -37,7 +37,7 @@ function createLogger(fname: string): Logger | undefined {
 	let logger: Logger;
 
 	// check if valid filename is provided
-	if (fname && /^[\w,\s-]+\.[A-Za-z0-9]{3}$/i.test(fname)) {
+	if (fname && /^[a-zA-Z0-9](?:[a-zA-Z0-9 ._-]*[a-zA-Z0-9])?\.[a-zA-Z0-9_-]+$/.test(fname)) {
 		// create Logger instance
 		logger = new Logger(fname);
 
