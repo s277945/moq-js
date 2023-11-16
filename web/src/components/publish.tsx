@@ -108,7 +108,7 @@ export default function Publish() {
 
 		// Special case localhost to fetch the TLS fingerprint from the server.
 		// TODO remove this when WebTransport correctly supports self-signed certificates
-		const fingerprint = server.startsWith("localhost") ? `https://${server}/fingerprint` : undefined
+		const fingerprint = server ? `https://${server}/fingerprint` : undefined
 
 		const client = new Client({
 			url,
