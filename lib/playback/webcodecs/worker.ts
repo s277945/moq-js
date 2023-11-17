@@ -6,6 +6,7 @@ import * as Video from "./video"
 import * as MP4 from "../../media/mp4"
 import * as Message from "./message"
 import { asError } from "../../common/error"
+import { initLoggerFile } from "@kixelated/moq/common/index"
 
 class Worker {
 	// Timeline receives samples, buffering them and choosing the timestamp to render.
@@ -17,6 +18,7 @@ class Worker {
 	// Renderer requests samples, rendering video frames and emitting audio frames.
 	#audio?: Audio.Renderer
 	#video?: Video.Renderer
+	logInited = false
 
 	on(e: MessageEvent) {
 		const msg = e.data as Message.ToWorker
@@ -41,6 +43,10 @@ class Worker {
 	}
 
 	#onConfig(msg: Message.Config) {
+		if (msg.logger) {
+			//log filename is derived from current date and time
+			initLoggerFile(msg.logger, true) // init logger server and check status
+		}
 		if (msg.audio) {
 			this.#audio = new Audio.Renderer(msg.audio, this.#timeline.audio)
 		}

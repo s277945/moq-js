@@ -12,6 +12,7 @@ import { Catalog, isAudioTrack } from "../../media/catalog"
 export interface PlayerConfig {
 	element: OffscreenCanvas
 	catalog: Catalog
+	logger?: string
 }
 
 // This is a non-standard way of importing worklet/workers.
@@ -45,6 +46,8 @@ export default class Player {
 			}
 		}
 
+		this.send({ config: { logger: config.logger } })
+
 		const msg: Message.Config = {}
 
 		// Only configure audio if we have an audio track
@@ -63,7 +66,6 @@ export default class Player {
 		msg.video = {
 			canvas: config.element,
 		}
-
 		this.send({ config: msg }, msg.video.canvas)
 	}
 

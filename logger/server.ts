@@ -28,7 +28,7 @@ app.post("/latency-init", (req, res) => {
 		res.send("POST request received, logger available");
 		if (!getFileStatus(fileName) && !body.segment) {
 			// log telemetry string to file when new session starts
-			if (fileLogLine("// START //", fileName)) {
+			if (fileLogLine("Track ID;Object ID;Group ID;Latency;", fileName)) {
 				console.log("// Player session started //");
 				setFileStatus(fileName, 1);
 			} else console.log("Invalid filename provided");
@@ -39,7 +39,7 @@ app.post("/latency-init", (req, res) => {
 	} else {
 		res.send("POST request received, logger available");
 		if (!getFileStatus("log.txt") && !body.segment) {
-			fileLogLine("// START //"); // log telemetry string to file when new session starts
+			fileLogLine("Track ID;Object ID;Group ID;Latency;"); // log telemetry string to file when new session starts
 			console.log("// Player session started //");
 			setFileStatus("log.txt", 1);
 		} else if (!body.segment) {
@@ -61,7 +61,7 @@ app.post("/latency-data", (req, res) => {
 		dest.latency != undefined
 	) {
 		// create log string
-		const str = dest.track + " " + dest.group + " " + dest.object + " " + dest.latency;
+		const str = dest.track + ";" + dest.group + ";" + dest.object + ";" + dest.latency;
 		fileLogLine(str, filename); // log telemetry string to file
 		// log telemetry data to console
 		console.log(
@@ -88,7 +88,7 @@ app.post("/skipped-segment", (req, res) => {
 			const track = req.body.track;
 			const filename = req.body.fileName;
 			// create log string
-			const str = track + " " + id + " 0 " + reason;
+			const str = track + ";" + id + ";0;" + reason;
 			fileLogLine(str, filename); // log telemetry string to file
 			// log telemetry data to console
 			console.log("Skipped segment", id, "of track", track, ":", reason);

@@ -47,9 +47,11 @@ export default function Watch(props: { name: string }) {
 
 		const element = useElement()
 		//log filename is derived from current date and time
-		initLoggerFile("log_" + dateTime + ".txt") // init logger server and check status
+		const loggerFileName = "log_" + dateTime + ".txt"
+		initLoggerFile(loggerFileName) // init logger server and check status
+		localStorage.setItem("log_filename", "log_" + dateTime + ".txt")
 
-		Player.create({ url, fingerprint, element }).then(setPlayer).catch(setError)
+		Player.create({ url, fingerprint, element, logger: loggerFileName }).then(setPlayer).catch(setError)
 	})
 
 	createEffect(() => {

@@ -16,6 +16,7 @@ export interface PlayerConfig {
 	url: string
 	fingerprint?: string // URL to fetch TLS certificate fingerprint
 	element: HTMLCanvasElement | HTMLVideoElement
+	logger?: string
 }
 
 // This class must be created on the main thread due to AudioContext.
@@ -58,7 +59,7 @@ export class Player {
 
 		if (config.element instanceof HTMLCanvasElement) {
 			const element = config.element.transferControlToOffscreen()
-			backend = new Webcodecs({ element, catalog })
+			backend = new Webcodecs({ element, catalog, logger: config.logger })
 		} else {
 			backend = new MSE({ element: config.element })
 		}

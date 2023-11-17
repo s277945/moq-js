@@ -4,6 +4,7 @@ import { RingShared } from "../../common/ring"
 export interface Config {
 	audio?: ConfigAudio
 	video?: ConfigVideo
+	logger?: string
 }
 
 export interface ConfigAudio {

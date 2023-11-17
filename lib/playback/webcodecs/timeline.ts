@@ -1,5 +1,5 @@
 import type { Frame } from "../../media/mp4"
-import { initLoggerFile, postSkippedSegmentIdAndForget } from "@kixelated/moq/common/index"
+import { postSkippedSegmentIdAndForget } from "@kixelated/moq/common/index"
 export type { Frame }
 
 export interface Range {
@@ -38,13 +38,6 @@ export class Component {
 		})
 		// This is a hack to have an async channel with 100 items.
 		this.#segments = new TransformStream({}, { highWaterMark: 100 })
-
-		const today = new Date()
-		const date = today.getFullYear() + "-" + (today.getMonth() + 1) + "-" + today.getDate()
-		const time = today.getHours() + "." + today.getMinutes() + "." + today.getSeconds()
-		const dateTime = date + "_" + time
-		//log filename is derived from current date and time
-		initLoggerFile("log_" + dateTime + ".txt", true) // init logger server and check status
 	}
 
 	get segments() {
