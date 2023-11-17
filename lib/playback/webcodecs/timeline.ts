@@ -21,6 +21,7 @@ export class Timeline {
 
 interface Segment {
 	sequence: number
+	track: bigint //to log skipped segments track number
 	frames: ReadableStream<Frame>
 }
 
@@ -35,7 +36,6 @@ export class Component {
 			pull: this.#pull.bind(this),
 			cancel: this.#cancel.bind(this),
 		})
-
 		// This is a hack to have an async channel with 100 items.
 		this.#segments = new TransformStream({}, { highWaterMark: 100 })
 
@@ -80,7 +80,6 @@ export class Component {
 				this.#current = undefined
 				continue
 			}
-
 			if (!isSegment(value)) {
 				// Return so the reader can decide when to get the next frame.
 				controller.enqueue(value)
@@ -92,14 +91,38 @@ export class Component {
 				if (value.sequence < this.#current.sequence) {
 					// Our segment is older than the current, abandon it.
 					console.log(value.sequence)
-					postSkippedSegmentIdAndForget({ id: value.sequence, reason: "too old" })
-					await value.frames.cancel("skipping segment; too old")
+					//log skipped segment data
+					postSkippedSegmentIdAndForget({
+						id: value.sequence,
+						track: BigInt(value.track).toString(),
+						reason: "too old",
+					})
+					//print data to console
+					await value.frames.cancel(
+						"skipping segment " +
+							value.sequence +
+							" of track " +
+							BigInt(value.track).toString() +
+							" : too old",
+					)
 					continue
 				} else {
 					// Our segment is newer than the current, cancel the old one.
 					console.log(this.#current.sequence)
-					postSkippedSegmentIdAndForget({ id: value.sequence, reason: "too slow" })
-					await this.#current.frames.cancel("skipping segment; too slow")
+					//log skipped segment data
+					postSkippedSegmentIdAndForget({
+						id: this.#current.sequence,
+						track: BigInt(this.#current.track).toString(),
+						reason: "too slow",
+					})
+					//print data to console
+					await this.#current.frames.cancel(
+						"skipping segment " +
+							this.#current.sequence +
+							" of track " +
+							BigInt(this.#current.track).toString() +
+							" : too old",
+					)
 				}
 			}
 

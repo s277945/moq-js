@@ -85,12 +85,13 @@ app.post("/skipped-segment", (req, res) => {
 		if (req.body.id != undefined && req.body.reason != undefined) {
 			const id = req.body.id;
 			const reason = req.body.reason;
+			const track = req.body.track;
 			const filename = req.body.fileName;
 			// create log string
-			const str = "-1 " + id + " 0 " + reason;
+			const str = track + " " + id + " 0 " + reason;
 			fileLogLine(str, filename); // log telemetry string to file
 			// log telemetry data to console
-			console.log("Skipped segment", id, ":", reason);
+			console.log("Skipped segment", id, "of track", track, ":", reason);
 		} else console.log("Unexpected data format :", req.body); // log raw data to console if unexpected format
 		res.send("Received POST request for telemetry data");
 	}

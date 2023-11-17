@@ -79,6 +79,7 @@ class Worker {
 		const segments = timeline.segments.getWriter()
 		await segments.write({
 			sequence: msg.header.group,
+			track: msg.header.track,
 			frames: container.decode.readable,
 		})
 		segments.releaseLock()

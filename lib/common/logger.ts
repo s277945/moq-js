@@ -22,6 +22,7 @@ export interface LogData {
 export interface SkippedSegmentData {
 	id: number
 	reason: string
+	track: string
 }
 
 export function getLoggerStatus(): void {
@@ -86,7 +87,7 @@ export function postSkippedSegmentIdAndForget(skipped: SkippedSegmentData): void
 	if (skipped && loggerServerStatus() == 1)
 		fetch("http://localhost:3000/skipped-segment", {
 			method: "POST",
-			body: JSON.stringify({ id: skipped.id, reason: skipped.reason, fileName: fileName }),
+			body: JSON.stringify({ id: skipped.id, track: skipped.track, reason: skipped.reason, fileName: fileName }),
 			headers: { "Content-Type": "application/json" },
 		})
 	return
