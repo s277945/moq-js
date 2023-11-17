@@ -19,6 +19,11 @@ export interface LogData {
 	latency: number
 }
 
+export interface SkippedSegmentData {
+	id: number
+	reason: string
+}
+
 export function getLoggerStatus(): void {
 	fetch("http://localhost:3000/latency-data", {
 		method: "GET",
@@ -39,10 +44,10 @@ export function getLoggerStatus(): void {
 		})
 }
 // function to get logger server status
-export function initLoggerFile(fName?: string): void {
+export function initLoggerFile(fName?: string, segment?: boolean): void {
 	fetch("http://localhost:3000/latency-init", {
 		method: "POST",
-		body: fName ? JSON.stringify({ fileName: fName }) : "",
+		body: fName ? JSON.stringify({ fileName: fName, segment: segment ? true : false }) : "",
 		headers: { "Content-Type": "application/json" },
 	})
 		.then((response) => {
@@ -66,10 +71,22 @@ export function getCachedLoggerStatus(): boolean {
 }
 // function to post latency in LogData format in fire and forget manner
 export function postLogDataAndForget(data: LogData): void {
+	console.log(loggerServerStatus())
 	if (data && loggerServerStatus() == 1)
 		fetch("http://localhost:3000/latency-data", {
 			method: "POST",
 			body: JSON.stringify({ data: data, fileName: fileName }),
+			headers: { "Content-Type": "application/json" },
+		})
+	return
+}
+// function to post latency in LogData format in fire and forget manner
+export function postSkippedSegmentIdAndForget(skipped: SkippedSegmentData): void {
+	console.log("skiplog", skipped, loggerServerStatus())
+	if (skipped && loggerServerStatus() == 1)
+		fetch("http://localhost:3000/skipped-segment", {
+			method: "POST",
+			body: JSON.stringify({ id: skipped.id, reason: skipped.reason, fileName: fileName }),
 			headers: { "Content-Type": "application/json" },
 		})
 	return

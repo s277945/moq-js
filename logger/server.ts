@@ -17,14 +17,6 @@ const port = 3000;
 app.get("/latency-data", (req, res) => {
 	console.log("GET request received from:", req.ip == "::1" ? "localhost" : req.ip);
 	res.send("GET request received, logger available");
-	if (!getFileStatus("log.txt")) {
-		fileLogLine("// START //"); // log telemetry string to file when new session starts
-		console.log("// Player session started //");
-		setFileStatus("log.txt", 1);
-	} else {
-		fileLogLine("// END //" + "\n" + "// START //"); // log telemetry string to file when new session starts
-		console.log("// Player session ended //" + "\n" + "// Player session started //");
-	}
 });
 
 //POST response for localhost:/latency-init
@@ -34,23 +26,23 @@ app.post("/latency-init", (req, res) => {
 	if (body && body.fileName) {
 		const fileName = body.fileName;
 		res.send("POST request received, logger available");
-		if (!getFileStatus(fileName)) {
+		if (!getFileStatus(fileName) && !body.segment) {
 			// log telemetry string to file when new session starts
 			if (fileLogLine("// START //", fileName)) {
 				console.log("// Player session started //");
 				setFileStatus(fileName, 1);
 			} else console.log("Invalid filename provided");
-		} else {
+		} else if (!body.segment) {
 			fileLogLine("// END //" + "\n" + "// START //", fileName); // log telemetry string to file when new session starts
 			console.log("// Player session ended //" + "\n" + "// Player session started //");
 		}
 	} else {
 		res.send("POST request received, logger available");
-		if (!getFileStatus("log.txt")) {
+		if (!getFileStatus("log.txt") && !body.segment) {
 			fileLogLine("// START //"); // log telemetry string to file when new session starts
 			console.log("// Player session started //");
 			setFileStatus("log.txt", 1);
-		} else {
+		} else if (!body.segment) {
 			fileLogLine("// END //" + "\n" + "// START //"); // log telemetry string to file when new session starts
 			console.log("// Player session ended //" + "\n" + "// Player session started //");
 		}
@@ -85,6 +77,23 @@ app.post("/latency-data", (req, res) => {
 		);
 	} else console.log("Unexpected data format :", req.body); // log raw data to console if unexpected format
 	res.send("Received POST request for telemetry data");
+});
+
+//POST response for localhost:/skipped-segment
+app.post("/skipped-segment", (req, res) => {
+	if (req.body) {
+		if (req.body.id != undefined && req.body.reason != undefined) {
+			const id = req.body.id;
+			const reason = req.body.reason;
+			const filename = req.body.fileName;
+			// create log string
+			const str = "-1 " + id + " 0 " + reason;
+			fileLogLine(str, filename); // log telemetry string to file
+			// log telemetry data to console
+			console.log("Skipped segment", id, ":", reason);
+		} else console.log("Unexpected data format :", req.body); // log raw data to console if unexpected format
+		res.send("Received POST request for telemetry data");
+	}
 });
 
 //POST response for localhost:/latency-data-end
