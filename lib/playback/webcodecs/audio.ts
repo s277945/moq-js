@@ -63,39 +63,13 @@ export class Renderer {
 		for (;;) {
 			const { value: frame, done } = await reader.read()
 			if (done) break
-			const size = frame.allocationSize({ planeIndex: 0 })
-			const data = new ArrayBuffer(size)
-			frame.copyTo(data, { planeIndex: 0 })
-			/*const buffer = new AudioBuffer({
-				length: frame.numberOfFrames,
-				numberOfChannels: frame.numberOfChannels,
-				sampleRate: frame.sampleRate,
-			})*/
-			// if (this.#context) {
-			// 	const volume = this.#context.createGain()
-			// 	volume.gain.value = 2.0
-			// 	const buffer = this.#context.createBuffer(
-			// 		frame.numberOfChannels,
-			// 		frame.numberOfFrames,
-			// 		frame.sampleRate,
-			// 	)
-			// 	buffer.getChannelData(0).set(new Float32Array(data))
-			// 	const source = new AudioBufferSourceNode(this.#context, {
-			// 		buffer,
-			// 	})
-			// 	//const source = this.#context.createBufferSource()
-			// 	source.buffer = buffer
-			// 	source.connect(volume)
-			// 	source.connect(this.#context.destination)
-			// 	source.start()
-			// }
 
 			// Write audio samples to the ring buffer, dropping when there's no space.
-			// const written = this.#ring.write(frame)
+			const written = this.#ring.write(frame)
 
-			// if (written < frame.numberOfFrames) {
-			// 	console.warn(`droppped ${frame.numberOfFrames - written} audio samples`)
-			// }
+			if (written < frame.numberOfFrames) {
+				console.warn(`droppped ${frame.numberOfFrames - written} audio samples`)
+			}
 		}
 	}
 }

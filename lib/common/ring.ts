@@ -10,6 +10,7 @@ interface FrameCopyToOptions {
 	frameCount?: number
 	frameOffset?: number
 	planeIndex: number
+	format?: string
 }
 // This is implemented by AudioData in WebCodecs, but we don't import it because it's a DOM type.
 interface Frame {
@@ -89,6 +90,7 @@ export class Ring {
 				frame.copyTo(full, {
 					planeIndex,
 					frameCount: endIndex - startIndex,
+					format: "f32-planar",
 				})
 			} else {
 				const first = channel.subarray(startIndex)
@@ -97,6 +99,7 @@ export class Ring {
 				frame.copyTo(first, {
 					planeIndex,
 					frameCount: first.length,
+					format: "f32-planar",
 				})
 
 				// We need this conditional when startIndex == 0 and endIndex == 0
@@ -106,6 +109,7 @@ export class Ring {
 						planeIndex,
 						frameOffset: first.length,
 						frameCount: second.length,
+						format: "f32-planar",
 					})
 				}
 			}

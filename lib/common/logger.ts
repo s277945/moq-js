@@ -72,7 +72,6 @@ export function getCachedLoggerStatus(): boolean {
 }
 // function to post latency in LogData format in fire and forget manner
 export function postLogDataAndForget(data: LogData): void {
-	console.log(loggerServerStatus())
 	if (data && loggerServerStatus() == 1)
 		fetch("http://localhost:3000/latency-data", {
 			method: "POST",
