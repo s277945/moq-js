@@ -154,14 +154,14 @@ export class Stream {
 	// Will error if two messages are read at once.
 	async recv(): Promise<Message> {
 		const msg = await this.decoder.message()
-		console.log("received message", msg)
+		//console.log("received message", msg)
 		return msg
 	}
 
 	async send(msg: Message) {
 		const unlock = await this.#lock()
 		try {
-			console.log("sending message", msg)
+			//console.log("sending message", msg)
 			await this.encoder.message(msg)
 		} finally {
 			unlock()

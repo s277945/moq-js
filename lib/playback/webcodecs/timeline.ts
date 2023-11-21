@@ -83,7 +83,6 @@ export class Component {
 			if (this.#current) {
 				if (value.sequence < this.#current.sequence) {
 					// Our segment is older than the current, abandon it.
-					console.log(value.sequence)
 					//log skipped segment data
 					postSkippedSegmentIdAndForget({
 						id: value.sequence,
@@ -101,7 +100,6 @@ export class Component {
 					continue
 				} else {
 					// Our segment is newer than the current, cancel the old one.
-					console.log(this.#current.sequence)
 					//log skipped segment data
 					postSkippedSegmentIdAndForget({
 						id: this.#current.sequence,

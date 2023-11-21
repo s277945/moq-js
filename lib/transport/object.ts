@@ -25,7 +25,13 @@ export class Objects {
 		const stream = await this.quic.createUnidirectionalStream() //creates a new quic stream
 		header.timestamp = Date.now()
 		await this.#encode(stream, header) //writes object inside stream
-		console.log("sent object: ", header) //object sent log
+		//console.log("sent object: ", header) //object sent log
+		postLogDataAndForget({
+			object: header.object,
+			group: header.group,
+			track: BigInt(header.track).toString(), // converted to string because bigint is not natively supported in JSON
+			status: "sent",
+		})
 		return stream
 	}
 
@@ -42,20 +48,21 @@ export class Objects {
 		if (header.size) {
 			//throw new Error("TODO: handle OBJECT with size")
 		}
-		console.log("received object: ", header) //object received log
+		//console.log("received object: ", header) //object received log
 		if (header.timestamp) {
 			// if object timestamp is present, calculate and print latency
 			const latency = Date.now() - header.timestamp
-			console.log("Latency for object ", header.object, "of group", header.group, ":", latency, "ms")
+			//console.log("Latency for object ", header.object, "of group", header.group, ":", latency, "ms")
 			// send latency data to logger server
-			if (latency <= 500)
-				// maximum object latency to log, objects with higher latency are ignored
-				postLogDataAndForget({
-					object: header.object,
-					group: header.group,
-					track: BigInt(header.track).toString(), // converted to string because bigint is not natively supported in JSON
-					latency: latency,
-				})
+			// if (latency <= 500)
+			// maximum object latency to log, objects with higher latency are ignored
+			postLogDataAndForget({
+				object: header.object,
+				group: header.group,
+				track: BigInt(header.track).toString(), // converted to string because bigint is not natively supported in JSON
+				latency: latency,
+				status: "received",
+			})
 		}
 		return { header, stream }
 	}

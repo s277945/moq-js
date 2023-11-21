@@ -18,7 +18,6 @@ class Worker {
 	// Renderer requests samples, rendering video frames and emitting audio frames.
 	#audio?: Audio.Renderer
 	#video?: Video.Renderer
-	logInited = false
 
 	on(e: MessageEvent) {
 		const msg = e.data as Message.ToWorker

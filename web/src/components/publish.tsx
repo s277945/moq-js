@@ -1,6 +1,6 @@
 import { Broadcast, VideoEncoder, AudioEncoder } from "@kixelated/moq/contribute"
 import { Client, Connection } from "@kixelated/moq/transport"
-
+import { initLoggerFile, getCachedLoggerStatus } from "@kixelated/moq/common"
 import { createSignal, createEffect, onCleanup, createMemo, Show, For, createSelector, Switch, Match } from "solid-js"
 
 import Fail from "./fail"
@@ -102,6 +102,14 @@ export default function Publish() {
 	if (server != import.meta.env.PUBLIC_RELAY_HOST) {
 		watchUrl = `${watchUrl}?server=${server}`
 	}
+
+	const today = new Date()
+	const date = today.getFullYear() + "-" + (today.getMonth() + 1) + "-" + today.getDate()
+	const time = today.getHours() + "." + today.getMinutes() + "." + today.getSeconds()
+	const dateTime = date + "_" + time
+	//log filename is derived from current date and time
+	const loggerFileName = "log_" + dateTime + ".txt"
+	initLoggerFile("Publisher", loggerFileName) // init logger server and check status
 
 	createEffect(() => {
 		const url = `https://${server}/${id}`
@@ -213,8 +221,10 @@ export default function Publish() {
 		if (!relative) return
 
 		// Compute the absolute URL
-		const absolute = new URL(relative, window.location.href).href
-
+		let absolute = new URL(relative, window.location.href).href
+		if (getCachedLoggerStatus()) {
+			absolute += "&logFileName=" + loggerFileName
+		}
 		navigator.clipboard
 			.writeText(absolute)
 			.then(() => setCopied(true))

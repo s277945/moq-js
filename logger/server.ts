@@ -23,26 +23,28 @@ app.get("/latency-data", (req, res) => {
 app.post("/latency-init", (req, res) => {
 	console.log("POST request received from:", req.ip == "::1" ? "localhost" : req.ip);
 	const body = req.body;
-	if (body && body.fileName) {
+	if (body && body.role && body.fileName) {
+		console.log("Role:", body.role);
 		const fileName = body.fileName;
 		res.send("POST request received, logger available");
 		if (!getFileStatus(fileName) && !body.segment) {
 			// log telemetry string to file when new session starts
-			if (fileLogLine("Track ID;Object ID;Group ID;Latency;", fileName)) {
+			if (fileLogLine("Track ID;Object ID;Group ID;Status;Latency;", fileName)) {
 				console.log("// Player session started //");
 				setFileStatus(fileName, 1);
 			} else console.log("Invalid filename provided");
-		} else if (!body.segment) {
+		} else if (!body.segment && body.role == "Subscriber") {
+			// for now one subscriber at a time for a file
 			fileLogLine("// END //" + "\n" + "// START //", fileName); // log telemetry string to file when new session starts
 			console.log("// Player session ended //" + "\n" + "// Player session started //");
 		}
 	} else {
 		res.send("POST request received, logger available");
 		if (!getFileStatus("log.txt") && !body.segment) {
-			fileLogLine("Track ID;Object ID;Group ID;Latency;"); // log telemetry string to file when new session starts
+			fileLogLine("Track ID;Object ID;Group ID;Status;Latency;"); // log telemetry string to file when new session starts
 			console.log("// Player session started //");
 			setFileStatus("log.txt", 1);
-		} else if (!body.segment) {
+		} else if (!body.segment && body.role == "Subscriber") {
 			fileLogLine("// END //" + "\n" + "// START //"); // log telemetry string to file when new session starts
 			console.log("// Player session ended //" + "\n" + "// Player session started //");
 		}
@@ -51,30 +53,29 @@ app.post("/latency-init", (req, res) => {
 
 //POST response for localhost:/latency-data
 app.post("/latency-data", (req, res) => {
-	const dest = req.body.data;
+	const data = req.body.data;
 	const filename = req.body.fileName;
-	if (
-		dest &&
-		dest.object != undefined &&
-		dest.group != undefined &&
-		dest.track != undefined &&
-		dest.latency != undefined
-	) {
+	if (data && data.object != undefined && data.group != undefined && data.track != undefined) {
 		// create log string
-		const str = dest.track + ";" + dest.group + ";" + dest.object + ";" + dest.latency;
-		fileLogLine(str, filename); // log telemetry string to file
+		let str = "";
+		if (data.status != undefined || data.latency != undefined)
+			str += data.track + ";" + data.group + ";" + data.object;
+		if (data.status != undefined) {
+			str += ";" + data.status;
+			if (data.status === "sent")
+				console.log("Sent object", data.object + " of group " + data.group + " of track " + data.track);
+		}
+		if (data.latency != undefined) {
+			str += ";" + data.latency;
+			console.log(
+				"Latency for object",
+				data.object + " of group " + data.group + " of track " + data.track + data.latency
+					? " : " + data.latency + " ms"
+					: "",
+			);
+		}
+		if (str !== "") fileLogLine(str, filename); // log telemetry string to file
 		// log telemetry data to console
-		console.log(
-			"Latency for object " +
-				dest.object +
-				" of group " +
-				dest.group +
-				" of track " +
-				dest.track +
-				" : " +
-				dest.latency +
-				" ms",
-		);
 	} else console.log("Unexpected data format :", req.body); // log raw data to console if unexpected format
 	res.send("Received POST request for telemetry data");
 });
@@ -99,8 +100,8 @@ app.post("/skipped-segment", (req, res) => {
 
 //POST response for localhost:/latency-data-end
 app.post("/latency-data-end", (req, res) => {
-	const dest = req.body;
-	if (dest.playerClosed) {
+	const data = req.body;
+	if (data.playerClosed) {
 		fileLogLine("/n" + "// Player session ended //"); // log data to file
 		console.log("// Player session ended //"); // log data to console
 	} else console.log("Mmmmmmm");
@@ -109,8 +110,8 @@ app.post("/latency-data-end", (req, res) => {
 
 //POST response for localhost:/latency-string
 app.post("/latency-string", (req, res) => {
-	const dest = req.body;
-	if (dest.str) fileLogLine(dest.str); // log telemetry data to file
+	const data = req.body;
+	if (data.str) fileLogLine(data.str); // log telemetry data to file
 	console.log(req.body); // log telemetry data to console
 	res.send("Received POST request for telemetry data");
 });

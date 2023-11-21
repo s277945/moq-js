@@ -16,7 +16,8 @@ export interface LogData {
 	object: number
 	group: number
 	track: string
-	latency: number
+	latency?: number
+	status: string
 }
 
 export interface SkippedSegmentData {
@@ -45,10 +46,10 @@ export function getLoggerStatus(): void {
 		})
 }
 // function to get logger server status
-export function initLoggerFile(fName?: string, segment?: boolean): void {
+export function initLoggerFile(role: string, fName?: string, segment?: boolean): void {
 	fetch("http://localhost:3000/latency-init", {
 		method: "POST",
-		body: fName ? JSON.stringify({ fileName: fName, segment: segment ? true : false }) : "",
+		body: fName ? JSON.stringify({ fileName: fName, role: role, segment: segment ? true : false }) : "",
 		headers: { "Content-Type": "application/json" },
 	})
 		.then((response) => {

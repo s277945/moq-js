@@ -35,7 +35,9 @@ export default function Watch(props: { name: string }) {
 
 	const [usePlayer, setPlayer] = createSignal<Player | undefined>()
 	createEffect(() => {
-		const url = `https://${server}/${props.name}`
+		const urlParams = `https://${server}/${props.name}`.split("&")
+		const url = urlParams[0]
+		const tempFileName = urlParams[1] ? urlParams[1] : ""
 		const today = new Date()
 		const date = today.getFullYear() + "-" + (today.getMonth() + 1) + "-" + today.getDate()
 		const time = today.getHours() + "." + today.getMinutes() + "." + today.getSeconds()
@@ -47,9 +49,9 @@ export default function Watch(props: { name: string }) {
 
 		const element = useElement()
 		//log filename is derived from current date and time
-		const loggerFileName = "log_" + dateTime + ".txt"
-		initLoggerFile(loggerFileName) // init logger server and check status
-		localStorage.setItem("log_filename", "log_" + dateTime + ".txt")
+		const loggerFileName = urlParams[1] ? urlParams[1].replace("logFileName=", "") : "log_" + dateTime + ".txt"
+		initLoggerFile("Subscriber", loggerFileName) // init logger server and check status
+		console.log(url)
 
 		Player.create({ url, fingerprint, element, logger: loggerFileName }).then(setPlayer).catch(setError)
 	})
