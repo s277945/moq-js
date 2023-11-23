@@ -35,8 +35,8 @@ app.post("/latency-init", (req, res) => {
 			} else console.log("Invalid filename provided");
 		} else if (!body.segment && body.role == "Subscriber") {
 			// for now one subscriber at a time for a file
-			fileLogLine("// END //" + "\n" + "// START //", fileName); // log telemetry string to file when new session starts
-			console.log("// Player session ended //" + "\n" + "// Player session started //");
+			//fileLogLine("// END //" + "\n" + "// START //", fileName); // log telemetry string to file when new session starts
+			console.log("// Subscriber session started //");
 		}
 	} else {
 		res.send("POST request received, logger available");

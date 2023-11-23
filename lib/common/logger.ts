@@ -83,7 +83,6 @@ export function postLogDataAndForget(data: LogData): void {
 }
 // function to post latency in LogData format in fire and forget manner
 export function postSkippedSegmentIdAndForget(skipped: SkippedSegmentData): void {
-	console.log("skiplog", skipped, loggerServerStatus())
 	if (skipped && loggerServerStatus() == 1)
 		fetch("http://localhost:3000/skipped-segment", {
 			method: "POST",
