@@ -43,7 +43,7 @@ function createLogger(fname: string): Logger | undefined {
 
 		// return created logger
 		return logger;
-	} else console.error("Invalid filename provided for logger file");
+	} else console.error("Invalid filename provided for logger file", ":", fname);
 
 	// if filename is invalid return undefined
 	return undefined;

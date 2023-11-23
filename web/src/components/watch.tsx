@@ -37,7 +37,6 @@ export default function Watch(props: { name: string }) {
 	createEffect(() => {
 		const urlParams = `https://${server}/${props.name}`.split("&")
 		const url = urlParams[0]
-		const tempFileName = urlParams[1] ? urlParams[1] : ""
 		const today = new Date()
 		const date = today.getFullYear() + "-" + (today.getMonth() + 1) + "-" + today.getDate()
 		const time = today.getHours() + "." + today.getMinutes() + "." + today.getSeconds()

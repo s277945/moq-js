@@ -44,7 +44,7 @@ class Worker {
 	#onConfig(msg: Message.Config) {
 		if (msg.logger) {
 			//log filename is derived from current date and time
-			initLoggerFile(msg.logger, true) // init logger server and check status
+			initLoggerFile("Player", msg.logger, true) // init logger server and check status
 		}
 		if (msg.audio) {
 			this.#audio = new Audio.Renderer(msg.audio, this.#timeline.audio)

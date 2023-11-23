@@ -21,32 +21,60 @@ app.get("/latency-data", (req, res) => {
 
 //POST response for localhost:/latency-init
 app.post("/latency-init", (req, res) => {
-	console.log("POST request received from:", req.ip == "::1" ? "localhost" : req.ip);
+	//console.log("POST request received from:", req.ip == "::1" ? "localhost" : req.ip);
 	const body = req.body;
 	if (body && body.role && body.fileName) {
-		console.log("Role:", body.role);
 		const fileName = body.fileName;
 		res.send("POST request received, logger available");
-		if (!getFileStatus(fileName) && !body.segment) {
-			// log telemetry string to file when new session starts
-			if (fileLogLine("Track ID;Object ID;Group ID;Status;Latency;", fileName)) {
-				console.log("// Player session started //");
+		// log telemetry string to a new file when new session starts
+		if (getFileStatus(fileName) != 2 && !body.segment) {
+			// if file is not initialized in this session, write file header line
+			if (!getFileStatus(fileName) && fileLogLine("Track ID;Object ID;Group ID;Status;Latency;", fileName))
+				console.log("Writing to file:", fileName);
+			else if (!getFileStatus(fileName)) {
+				console.log("Invalid filename provided"); // failed to create new file
+				return;
+			}
+			if (body.role == "Subscriber") {
+				// if subscriber log init, log subscriber start and set status to 2
+				setFileStatus(fileName, 2);
+				fileLogLine("-;-;-;SUBSCRIBER START;-;", fileName);
+				console.log("// Subscriber session started //");
+			} else if (body.role == "Publisher") {
+				// if publisher log init, log publisher start and set status to 2
 				setFileStatus(fileName, 1);
-			} else console.log("Invalid filename provided");
+				console.log("// Publisher session started //");
+				fileLogLine("-;-;-;PUBLISHER START;-;", fileName);
+			}
 		} else if (!body.segment && body.role == "Subscriber") {
 			// for now one subscriber at a time for a file
-			//fileLogLine("// END //" + "\n" + "// START //", fileName); // log telemetry string to file when new session starts
-			console.log("// Subscriber session started //");
+			fileLogLine("-;-;-;SUBSCRIBER RESTART;-;", fileName); // log telemetry string to file when new session starts
 		}
 	} else {
+		// log filename not specified
 		res.send("POST request received, logger available");
-		if (!getFileStatus("log.txt") && !body.segment) {
-			fileLogLine("Track ID;Object ID;Group ID;Status;Latency;"); // log telemetry string to file when new session starts
-			console.log("// Player session started //");
-			setFileStatus("log.txt", 1);
+		if (getFileStatus("log.txt") != 2 && !body.segment) {
+			// if file is not initialized in this session, write file header line
+			if (!getFileStatus("log.txt") && fileLogLine("Track ID;Object ID;Group ID;Status;Latency;", "log.txt"))
+				console.log("Writing to file:", "log.txt");
+			else if (!getFileStatus("log.txt")) {
+				console.log("Invalid filename provided"); // failed to create new file
+				return;
+			}
+			if (body.role == "Subscriber") {
+				// if subscriber log init, log subscriber start and set status to 2
+				setFileStatus("log.txt", 2);
+				fileLogLine("-;-;-;SUBSCRIBER START;-;", "log.txt");
+				console.log("// Subscriber session started //");
+			} else if (body.role == "Publisher") {
+				// if publisher log init, log publisher start and set status to 2
+				setFileStatus("log.txt", 1);
+				console.log("// Publisher session started //");
+				fileLogLine("-;-;-;PUBLISHER START;-;", "log.txt");
+			}
 		} else if (!body.segment && body.role == "Subscriber") {
-			fileLogLine("// END //" + "\n" + "// START //"); // log telemetry string to file when new session starts
-			console.log("// Player session ended //" + "\n" + "// Player session started //");
+			// for now one subscriber at a time for a file
+			fileLogLine("-;-;-;SUBSCRIBER RESTART;-;", "log.txt"); // log telemetry string to file when new session starts
 		}
 	}
 });
@@ -59,7 +87,7 @@ app.post("/latency-data", (req, res) => {
 		// create log string
 		let str = "";
 		if (data.status != undefined || data.latency != undefined)
-			str += data.track + ";" + data.group + ";" + data.object;
+			str += data.track + ";" + data.object + ";" + data.group;
 		if (data.status != undefined) {
 			str += ";" + data.status;
 			if (data.status === "sent")
@@ -69,9 +97,12 @@ app.post("/latency-data", (req, res) => {
 			str += ";" + data.latency;
 			console.log(
 				"Latency for object",
-				data.object + " of group " + data.group + " of track " + data.track + data.latency
-					? " : " + data.latency + " ms"
-					: "",
+				data.object +
+					" of group " +
+					data.group +
+					" of track " +
+					data.track +
+					(data.latency ? " : " + data.latency + " ms" : ""),
 			);
 		}
 		if (str !== "") fileLogLine(str, filename); // log telemetry string to file
