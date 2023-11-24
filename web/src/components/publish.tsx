@@ -10,6 +10,8 @@ const AUDIO_CODECS = [
 	"mp4a", // TODO support AAC
 ]
 
+const AUDIO_BITRATE = 0
+const VIDEO_BITRATE = 0
 interface VideoCodec {
 	name: string
 	profile: string
@@ -571,9 +573,10 @@ function Video(props: {
 	})
 
 	// Default values
+	const bitrateValue = VIDEO_BITRATE > 0 ? VIDEO_BITRATE : 2_000_000
 	const [height, setHeight] = createSignal(0) // use track default
 	const [fps, setFps] = createSignal(0) // use fps default
-	const [bitrate, setBitrate] = createSignal(2_000_000)
+	const [bitrate, setBitrate] = createSignal(bitrateValue)
 	const [codec, setCodec] = createSignal("")
 	const [profile, setProfile] = createSignal("")
 	const [supported, setSupported] = createSignal<VideoCodec[]>()
@@ -598,6 +601,7 @@ function Video(props: {
 			setFps(props.track.frameRate)
 		}
 	})
+	console.log("Video bitrate set to:", bitrateValue)
 
 	// Fetch the list of supported codecs.
 	createEffect(() => {
@@ -762,8 +766,9 @@ function Audio(props: {
 	advanced: boolean
 }) {
 	// Default values
+	const bitrateValue = AUDIO_BITRATE > 0 ? AUDIO_BITRATE : 128_000
 	const [codec, setCodec] = createSignal("")
-	const [bitrate, setBitrate] = createSignal(128_000)
+	const [bitrate, setBitrate] = createSignal(bitrateValue)
 	const [supported, setSupported] = createSignal<string[]>([])
 
 	// Fetch the list of supported codecs.
@@ -772,6 +777,7 @@ function Audio(props: {
 			const supported = await AudioEncoder.isSupported(config)
 			if (supported) return config
 		}
+		console.log("Audio bitrate set to:", bitrateValue)
 
 		// Call isSupported on each codec
 		const promises = AUDIO_CODECS.map((codec) =>
