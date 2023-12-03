@@ -4,6 +4,7 @@ import { asError } from "../common/error.js"
 
 import { Publisher } from "./publisher.js"
 import { Subscriber } from "./subscriber.js"
+import { WebTransport } from "@fails-components/webtransport"
 
 export class Connection {
 	// The established WebTransport session.

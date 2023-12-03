@@ -1,6 +1,7 @@
 import { Reader, Writer } from "./stream.js"
 import { postLogDataAndForget } from "../common/index.js"
 export { Reader, Writer }
+import { WebTransport } from "@fails-components/webtransport"
 
 // This is OBJECT but we can't use that name because it's a reserved word.
 
@@ -44,7 +45,7 @@ export class Objects {
 		if (done) return
 		const stream = value
 
-		const header = await this.#decode(stream) //extracts data from a single stream
+		const header = await this.#decode(stream as ReadableStream<Uint8Array>) //extracts data from a single stream
 		if (header.size) {
 			//throw new Error("TODO: handle OBJECT with size")
 		}
@@ -64,7 +65,7 @@ export class Objects {
 				status: "received",
 			})
 		}
-		return { header, stream }
+		return { header, stream: stream as ReadableStream<Uint8Array> }
 	}
 
 	async #decode(s: ReadableStream<Uint8Array>) {

@@ -5,6 +5,7 @@ import { initLoggerFile } from "../common/logger.js"
 import minimist from "minimist"
 
 const argv = minimist(process.argv.slice(2))
+process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = "0"
 
 const PUBLIC_RELAY_HOST = "130.192.16.111:4443"
 const DEFAULT_ID = 1

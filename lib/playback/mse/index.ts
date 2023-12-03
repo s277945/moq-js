@@ -32,7 +32,7 @@ export default class Player {
 		this.#audio = new Track(new Source(this.#source))
 		this.#video = new Track(new Source(this.#source))
 
-		this.#interval = setInterval(this.#tick.bind(this), 100)
+		this.#interval = window.setInterval(this.#tick.bind(this), 100)
 		this.#element.addEventListener("waiting", this.#tick.bind(this))
 	}
 
