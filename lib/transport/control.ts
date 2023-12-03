@@ -1,4 +1,4 @@
-import { Reader, Writer } from "./stream"
+import { Reader, Writer } from "./stream.js"
 
 export type Message = Subscriber | Publisher
 

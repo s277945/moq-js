@@ -1,6 +1,6 @@
-import * as Control from "./control"
-import { Queue, Watch } from "../common/async"
-import { Objects } from "./object"
+import * as Control from "./control.js"
+import { Queue, Watch } from "../common/async.js"
+import { Objects } from "./object.js"
 
 export class Publisher {
 	// Used to send control messages

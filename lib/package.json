@@ -6,7 +6,7 @@
 	"license": "(MIT OR Apache-2.0)",
 	"repository": "github:kixelated/moq-js",
 	"scripts": {
-		"build": "tsc -b && cp ../LICENSE* ./dist && cp ./README.md ./dist && cp ./package.json ./dist",
+		"build": "tsc -b",
 		"lint": "eslint .",
 		"fmt": "prettier --write ."
 	},
@@ -14,18 +14,23 @@
 		"@types/audioworklet": "^0.0.50",
 		"@types/dom-mediacapture-transform": "^0.1.6",
 		"@types/dom-webcodecs": "^0.1.8",
+		"@types/minimist": "^1.2.5",
+		"@types/node": "^20.10.3",
 		"@typescript-eslint/eslint-plugin": "^6.4.0",
 		"@typescript-eslint/parser": "^6.4.0",
 		"@typescript/lib-dom": "npm:@types/web@^0.0.115",
 		"eslint": "^8.47.0",
 		"eslint-config-prettier": "^9.0.0",
 		"eslint-plugin-prettier": "^5.0.0",
+		"minimist": "^1.2.8",
 		"prettier": "^3.0.1",
-		"typescript": "^5.1.6"
+		"typescript": "^5.3.2"
 	},
 	"dependencies": {
 		"@xenova/transformers": "^2.9.0",
 		"mp4box": "^0.5.2",
+		"ts-node": "^10.9.1",
+		"tslib": "^2.6.2",
 		"wavefile": "^11.0.0"
 	}
 }

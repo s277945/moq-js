@@ -1,5 +1,5 @@
-import { Reader, Writer } from "./stream"
-import { postLogDataAndForget } from "../common/index"
+import { Reader, Writer } from "./stream.js"
+import { postLogDataAndForget } from "../common/index.js"
 export { Reader, Writer }
 
 // This is OBJECT but we can't use that name because it's a reserved word.

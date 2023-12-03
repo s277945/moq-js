@@ -66,7 +66,7 @@ export default class Player {
 		msg.video = {
 			canvas: config.element,
 		}
-		this.send({ config: msg }, msg.video.canvas)
+		this.send({ config: msg })
 	}
 
 	// TODO initialize context now since the user clicked

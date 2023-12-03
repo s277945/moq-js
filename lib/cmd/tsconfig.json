@@ -1,0 +1,27 @@
+{
+	"extends": "../tsconfig.json",
+	"include": [".", "../lib"],
+	"compilerOptions": {
+		"types": ["dom-mediacapture-transform", "dom-webcodecs", "node"]
+	},
+	"references": [
+		{
+			"path": "../common"
+		},
+		{
+			"path": "../playback"
+		},
+		{
+			"path": "../playback/webcodecs/worklet"
+		},
+		{
+			"path": "../contribute"
+		},
+		{
+			"path": "../transport"
+		},
+		{
+			"path": "../media"
+		}
+	]
+}

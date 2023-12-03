@@ -1,4 +1,4 @@
-export { asError } from "./error"
+export { asError } from "./error.js"
 export {
 	getLoggerStatus,
 	initLoggerFile,
@@ -8,4 +8,4 @@ export {
 	postLogDataEnd,
 	postLogStringAndForget,
 	postLogStringAwait,
-} from "./logger"
+} from "./logger.js"

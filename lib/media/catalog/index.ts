@@ -1,6 +1,6 @@
-import { Connection } from "../../transport"
-import { Reader } from "../../transport/stream"
-import { asError } from "../../common/error"
+import { Connection } from "../../transport/index.js"
+import { Reader } from "../../transport/stream.js"
+import { asError } from "../../common/error.js"
 
 // JSON encoded catalog
 export class Catalog {

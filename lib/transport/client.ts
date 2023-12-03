@@ -1,8 +1,8 @@
-import * as Stream from "./stream"
-import * as Setup from "./setup"
-import * as Control from "./control"
-import { Objects } from "./object"
-import { Connection } from "./connection"
+import * as Stream from "./stream.js"
+import * as Setup from "./setup.js"
+import * as Control from "./control.js"
+import { Objects } from "./object.js"
+import { Connection } from "./connection.js"
 
 export interface ClientConfig {
 	url: string

@@ -4,6 +4,7 @@
 		"target": "es2022",
 		"module": "es2022",
 		"moduleResolution": "node",
+		"allowSyntheticDefaultImports": true,
 		"rootDir": ".",
 		"outDir": "./dist",
 		"declaration": true,
@@ -34,6 +35,9 @@
 		},
 		{
 			"path": "./media"
+		},
+		{
+			"path": "./cmd"
 		}
 	],
 	"paths": {

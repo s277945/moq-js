@@ -1,9 +1,9 @@
-import * as Control from "./control"
-import { Objects } from "./object"
-import { asError } from "../common/error"
+import * as Control from "./control.js"
+import { Objects } from "./object.js"
+import { asError } from "../common/error.js"
 
-import { Publisher } from "./publisher"
-import { Subscriber } from "./subscriber"
+import { Publisher } from "./publisher.js"
+import { Subscriber } from "./subscriber.js"
 
 export class Connection {
 	// The established WebTransport session.

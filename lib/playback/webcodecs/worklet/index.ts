@@ -1,6 +1,6 @@
 // TODO add support for @/ to avoid relative imports
-import { Ring } from "../../../common/ring"
-import * as Message from "./message"
+import { Ring } from "../../../common/ring.js"
+import * as Message from "./message.js"
 
 class Renderer extends AudioWorkletProcessor {
 	ring?: Ring

@@ -1,13 +1,11 @@
-import * as Message from "./webcodecs/message"
+import * as Message from "./webcodecs/message.js"
 
-import { Connection } from "../transport/connection"
-import { Catalog, isAudioTrack, isMp4Track, Mp4Track } from "../media/catalog"
-import { asError } from "../common/error"
+import { Connection } from "../transport/connection.js"
+import { Catalog, isMp4Track, Mp4Track } from "../media/catalog/index.js"
+import { asError } from "../common/error.js"
 
 // We support two different playback implementations:
-import Webcodecs from "./webcodecs"
-import MSE from "./mse"
-import { Client } from "../transport/client"
+import { Client } from "../transport/client.js"
 
 export type Range = Message.Range
 export type Timeline = Message.Timeline
@@ -15,14 +13,11 @@ export type Timeline = Message.Timeline
 export interface PlayerConfig {
 	url: string
 	fingerprint?: string // URL to fetch TLS certificate fingerprint
-	element: HTMLCanvasElement | HTMLVideoElement
 	logger?: string
 }
 
 // This class must be created on the main thread due to AudioContext.
 export class Player {
-	#backend: Webcodecs | MSE
-
 	// A periodically updated timeline
 	//#timeline = new Watch<Timeline | undefined>(undefined)
 
@@ -35,10 +30,9 @@ export class Player {
 	#close!: () => void
 	#abort!: (err: Error) => void
 
-	private constructor(connection: Connection, catalog: Catalog, backend: Webcodecs | MSE) {
+	private constructor(connection: Connection, catalog: Catalog) {
 		this.#connection = connection
 		this.#catalog = catalog
-		this.#backend = backend
 
 		const abort = new Promise<void>((resolve, reject) => {
 			this.#close = resolve
@@ -55,16 +49,7 @@ export class Player {
 
 		const catalog = await Catalog.fetch(connection)
 
-		let backend
-
-		if (config.element instanceof HTMLCanvasElement) {
-			const element = config.element.transferControlToOffscreen()
-			backend = new Webcodecs({ element, catalog, logger: config.logger })
-		} else {
-			backend = new MSE({ element: config.element })
-		}
-
-		return new Player(connection, catalog, backend)
+		return new Player(connection, catalog)
 	}
 
 	async #run() {
@@ -74,11 +59,6 @@ export class Player {
 		for (const track of this.#catalog.tracks) {
 			if (!isMp4Track(track)) {
 				throw new Error(`expected CMAF track`)
-			}
-
-			if (isAudioTrack(track) && this.#backend instanceof MSE) {
-				// TODO temporary hack to disable audio in MSE
-				continue
 			}
 
 			inits.add(track.init_track)
@@ -98,8 +78,6 @@ export class Player {
 		try {
 			const init = await Promise.race([sub.data(), this.#running])
 			if (!init) throw new Error("no init data")
-
-			this.#backend.init({ stream: init.stream, name })
 		} finally {
 			await sub.close()
 		}
@@ -115,13 +93,6 @@ export class Player {
 			for (;;) {
 				const segment = await Promise.race([sub.data(), this.#running])
 				if (!segment) break
-
-				this.#backend.segment({
-					init: track.init_track,
-					kind: track.kind,
-					header: segment.header,
-					stream: segment.stream,
-				})
 			}
 		} finally {
 			await sub.close()
@@ -134,12 +105,12 @@ export class Player {
 		}
 	}
 
+	// eslint-disable-next-line @typescript-eslint/require-await
 	async close(err?: Error) {
 		if (err) this.#abort(err)
 		else this.#close()
 
 		if (this.#connection) this.#connection.close()
-		if (this.#backend) await this.#backend.close()
 	}
 
 	async closed(): Promise<Error | undefined> {
@@ -159,10 +130,6 @@ export class Player {
 		this.#backend.seek({ timestamp })
 	}
 	*/
-
-	async play() {
-		await this.#backend.play()
-	}
 
 	/*
 	async *timeline() {

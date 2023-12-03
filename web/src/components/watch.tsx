@@ -52,7 +52,7 @@ export default function Watch(props: { name: string }) {
 		initLoggerFile("Subscriber", loggerFileName) // init logger server and check status
 		console.log(url)
 
-		Player.create({ url, fingerprint, element, logger: loggerFileName }).then(setPlayer).catch(setError)
+		Player.create({ url, fingerprint, logger: loggerFileName }).then(setPlayer).catch(setError)
 	})
 
 	createEffect(() => {

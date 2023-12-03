@@ -1,5 +1,5 @@
 import { Catalog } from "../media/catalog"
-import { Header } from "../transport/object"
+import { Header } from "../transport/object.js"
 
 // TODO make an interface for backends
 

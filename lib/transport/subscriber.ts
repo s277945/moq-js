@@ -1,7 +1,7 @@
-import * as Control from "./control"
-import { Queue, Watch } from "../common/async"
-import { Objects } from "./object"
-import type { Header } from "./object"
+import * as Control from "./control.js"
+import { Queue, Watch } from "../common/async.js"
+import { Objects } from "./object.js"
+import type { Header } from "./object.js"
 
 export class Subscriber {
 	// Use to send control messages.
