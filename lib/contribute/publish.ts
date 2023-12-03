@@ -1,6 +1,8 @@
 import { Broadcast, VideoEncoder, AudioEncoder } from "@kixelated/moq/contribute"
 import { Client, Connection } from "@kixelated/moq/transport"
 import { initLoggerFile, getCachedLoggerStatus } from "@kixelated/moq/common"
+import { pipeline } from "@xenova/transformers"
+import { WaveFile } from "wavefile"
 
 interface AudioTrackSettings {
 	autoGainControl: boolean
@@ -116,14 +118,17 @@ class Publisher {
 		await client.connect().then((value) => {
 			connection = value
 
-			const device = new MediaStream()
+			const stream = new MediaStream()
 			let audiotrack: AudioTrackSettings
 			let videotrack: VideoTrackSettings
 			let audioConfig: AudioEncoderConfig
 			let videoConfig: VideoEncoderConfig
+			const audioContext = new AudioContext()
+			// stream.addTrack(videoTrack)
+			// stream.addTrack(audioTrack)
 
 			const audio = new Promise<void>((resolve, reject) => {
-				const audioTracks = device?.getAudioTracks()
+				const audioTracks = stream?.getAudioTracks()
 				if (audioTracks && audioTracks.length != 0) {
 					audiotrack = audioTracks[0].getSettings() as AudioTrackSettings
 					const bitrate = AUDIO_BITRATE > 0 ? AUDIO_BITRATE : 128_000
@@ -164,7 +169,7 @@ class Publisher {
 			})
 
 			const video = new Promise<void>((resolve, reject) => {
-				const videoTracks = device?.getVideoTracks()
+				const videoTracks = stream?.getVideoTracks()
 				if (videoTracks && videoTracks.length != 0) {
 					videotrack = videoTracks[0].getSettings() as VideoTrackSettings
 					const bitrate = VIDEO_BITRATE > 0 ? VIDEO_BITRATE : 2_000_000
@@ -255,14 +260,19 @@ class Publisher {
 				.then(() => {
 					new Broadcast({
 						connection: value,
-						media: device,
+						media: stream,
 						audio: audioConfig,
 						video: videoConfig,
 					})
 				})
-				.catch(() => {
+				.catch((err) => {
+					console.error(err)
 					console.error("Could not initialize broadcast")
 				})
+
+			const buffer = Buffer.from()
+			const wav = new WaveFile(buffer)
+			wav.getSamples
 		})
 	}
 }

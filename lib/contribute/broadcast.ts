@@ -8,10 +8,27 @@ import { isAudioTrackSettings, isVideoTrackSettings } from "../common/settings"
 
 export interface BroadcastConfig {
 	connection: Connection
-	media: MediaStream
+	media?: MediaStream
 
 	audio?: AudioEncoderConfig
 	video?: VideoEncoderConfig
+
+	generator?: GeneratorConfig
+}
+
+export interface GeneratorConfig {
+	audio: boolean
+	video: boolean
+	videoCodec: string
+	width: number
+	height: number
+	frameRate: number
+	videoBitRate: number | undefined
+	audioCodec: string
+	sampleRate: number
+	sampleSize: number
+	channelCount: number
+	audioBitRate: number | undefined
 }
 
 export interface BroadcastConfigTrack {
@@ -32,59 +49,100 @@ export class Broadcast {
 		this.connection = config.connection
 		this.config = config
 		this.catalog = new Catalog()
+		if (this.config.media) {
+			for (const media of this.config.media.getTracks()) {
+				const track = new Track(media, config)
+				this.#tracks.set(track.name, track)
 
-		for (const media of this.config.media.getTracks()) {
-			const track = new Track(media, config)
-			this.#tracks.set(track.name, track)
+				const settings = media.getSettings()
 
-			const settings = media.getSettings()
+				let catalog: CatalogTrack
 
-			let catalog: CatalogTrack
+				const mp4Catalog: Mp4Track = {
+					container: "mp4",
+					kind: media.kind,
+					init_track: `${track.name}.mp4`,
+					data_track: `${track.name}.m4s`,
+				}
 
-			const mp4Catalog: Mp4Track = {
+				if (isVideoTrackSettings(settings)) {
+					if (!config.video) {
+						throw new Error("no video configuration provided")
+					}
+
+					const videoCatalog: VideoTrack = {
+						...mp4Catalog,
+						kind: "video",
+						codec: config.video.codec,
+						width: settings.width,
+						height: settings.height,
+						frame_rate: settings.frameRate,
+						bit_rate: config.video.bitrate,
+					}
+
+					catalog = videoCatalog
+				} else if (isAudioTrackSettings(settings)) {
+					if (!config.audio) {
+						throw new Error("no audio configuration provided")
+					}
+
+					const audioCatalog: AudioTrack = {
+						...mp4Catalog,
+						kind: "audio",
+						codec: config.audio.codec,
+						sample_rate: settings.sampleRate,
+						sample_size: settings.sampleSize,
+						channel_count: settings.channelCount,
+						bit_rate: config.audio.bitrate,
+					}
+
+					catalog = audioCatalog
+				} else {
+					throw new Error(`unknown track type: ${media.kind}`)
+				}
+
+				this.catalog.tracks.push(catalog)
+			}
+		} else if (this.config.generator) {
+			const generatorSettings = this.config.generator
+			const mp4CatalogV: Mp4Track = {
 				container: "mp4",
-				kind: media.kind,
-				init_track: `${track.name}.mp4`,
-				data_track: `${track.name}.m4s`,
+				kind: "mp4",
+				init_track: `testVideo.mp4`,
+				data_track: `testVideo.m4s`,
 			}
-
-			if (isVideoTrackSettings(settings)) {
-				if (!config.video) {
-					throw new Error("no video configuration provided")
-				}
-
-				const videoCatalog: VideoTrack = {
-					...mp4Catalog,
-					kind: "video",
-					codec: config.video.codec,
-					width: settings.width,
-					height: settings.height,
-					frame_rate: settings.frameRate,
-					bit_rate: config.video.bitrate,
-				}
-
-				catalog = videoCatalog
-			} else if (isAudioTrackSettings(settings)) {
-				if (!config.audio) {
-					throw new Error("no audio configuration provided")
-				}
-
-				const audioCatalog: AudioTrack = {
-					...mp4Catalog,
-					kind: "audio",
-					codec: config.audio.codec,
-					sample_rate: settings.sampleRate,
-					sample_size: settings.sampleSize,
-					channel_count: settings.channelCount,
-					bit_rate: config.audio.bitrate,
-				}
-
-				catalog = audioCatalog
-			} else {
-				throw new Error(`unknown track type: ${media.kind}`)
+			const videoCatalog: VideoTrack = {
+				...mp4CatalogV,
+				kind: "video",
+				codec: generatorSettings.videoCodec,
+				width: generatorSettings.width,
+				height: generatorSettings.height,
+				frame_rate: generatorSettings.frameRate,
+				bit_rate: generatorSettings.videoBitRate,
 			}
-
-			this.catalog.tracks.push(catalog)
+			const mp4CatalogA: Mp4Track = {
+				container: "mp4",
+				kind: "mp4",
+				init_track: `testAudio.mp4`,
+				data_track: `testAudio.m4s`,
+			}
+			const audioCatalog: AudioTrack = {
+				...mp4CatalogA,
+				kind: "audio",
+				codec: generatorSettings.audioCodec,
+				sample_rate: generatorSettings.sampleRate,
+				sample_size: generatorSettings.sampleSize,
+				channel_count: generatorSettings.channelCount,
+				bit_rate: generatorSettings.audioBitRate,
+			}
+			this.catalog.tracks.push(audioCatalog)
+			this.catalog.tracks.push(videoCatalog)
+		} else {
+			this.#running = new Promise<void>((res, rej) => {
+				console.error("Missing track data")
+				rej()
+			})
+			return
 		}
 
 		this.#running = this.#run()
@@ -222,7 +280,7 @@ export class Broadcast {
 
 	// Attach the captured video stream to the given video element.
 	attach(video: HTMLVideoElement) {
-		video.srcObject = this.config.media
+		video.srcObject = this.config.media ? this.config.media : null
 	}
 
 	close() {
