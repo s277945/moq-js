@@ -5,6 +5,7 @@ export interface Config {
 	audio?: ConfigAudio
 	video?: ConfigVideo
 	logger?: string
+	command_line?: boolean
 }
 
 export interface ConfigAudio {
@@ -15,7 +16,7 @@ export interface ConfigAudio {
 }
 
 export interface ConfigVideo {
-	canvas: OffscreenCanvas
+	canvas?: OffscreenCanvas
 }
 
 export interface Init {

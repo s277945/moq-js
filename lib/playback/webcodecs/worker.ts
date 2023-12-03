@@ -18,6 +18,7 @@ class Worker {
 	// Renderer requests samples, rendering video frames and emitting audio frames.
 	#audio?: Audio.Renderer
 	#video?: Video.Renderer
+	#cmd?: boolean
 
 	on(e: MessageEvent) {
 		const msg = e.data as Message.ToWorker
@@ -46,12 +47,17 @@ class Worker {
 			//log filename is derived from current date and time
 			initLoggerFile("Player", msg.logger, true) // init logger server and check status
 		}
-		if (msg.audio) {
-			this.#audio = new Audio.Renderer(msg.audio, this.#timeline.audio)
-		}
+		if (msg.command_line) {
+			this.#cmd = true
+		} else {
+			this.#cmd = false
+			if (msg.audio) {
+				this.#audio = new Audio.Renderer(msg.audio, this.#timeline.audio)
+			}
 
-		if (msg.video) {
-			this.#video = new Video.Renderer(msg.video, this.#timeline.video)
+			if (msg.video) {
+				this.#video = new Video.Renderer(msg.video, this.#timeline.video)
+			}
 		}
 	}
 
@@ -72,27 +78,31 @@ class Worker {
 		this.#inits.set(msg.init, initFork)
 
 		// Create a new stream that we will use to decode.
-		const container = new MP4.Parser()
+		if (!this.#cmd) {
+			const container = new MP4.Parser()
 
-		const timeline = msg.kind === "audio" ? this.#timeline.audio : this.#timeline.video
+			const timeline = msg.kind === "audio" ? this.#timeline.audio : this.#timeline.video
 
-		if (msg.header.object !== 0) {
+			if (msg.header.object !== 0) {
+				throw new Error("multiple objects per group not supported")
+			}
+
+			// Add the segment to the timeline
+			const segments = timeline.segments.getWriter()
+			await segments.write({
+				sequence: msg.header.group,
+				track: msg.header.track,
+				frames: container.decode.readable,
+			})
+			segments.releaseLock()
+
+			// Decode the init and then the segment itself
+			// TODO avoid decoding the init every time.
+			await initClone.pipeTo(container.decode.writable, { preventClose: true })
+			await msg.stream.pipeTo(container.decode.writable)
+		} else if (msg.header.object !== 0) {
 			throw new Error("multiple objects per group not supported")
 		}
-
-		// Add the segment to the timeline
-		const segments = timeline.segments.getWriter()
-		await segments.write({
-			sequence: msg.header.group,
-			track: msg.header.track,
-			frames: container.decode.readable,
-		})
-		segments.releaseLock()
-
-		// Decode the init and then the segment itself
-		// TODO avoid decoding the init every time.
-		await initClone.pipeTo(container.decode.writable, { preventClose: true })
-		await msg.stream.pipeTo(container.decode.writable)
 	}
 }
 

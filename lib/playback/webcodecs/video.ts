@@ -3,7 +3,7 @@ import * as MP4 from "../../media/mp4"
 import * as Message from "./message"
 
 export class Renderer {
-	#canvas: OffscreenCanvas
+	#canvas?: OffscreenCanvas
 	#timeline: Component
 
 	#decoder!: VideoDecoder
@@ -27,16 +27,19 @@ export class Renderer {
 			const { value: frame, done } = await reader.read()
 			if (done) break
 
-			self.requestAnimationFrame(() => {
-				this.#canvas.width = frame.displayWidth
-				this.#canvas.height = frame.displayHeight
+			if (this.#canvas) {
+				self.requestAnimationFrame(() => {
+					if (this.#canvas) {
+						this.#canvas.width = frame.displayWidth
+						this.#canvas.height = frame.displayHeight
+					}
+					const ctx = this.#canvas?.getContext("2d")
+					if (!ctx) throw new Error("failed to get canvas context")
 
-				const ctx = this.#canvas.getContext("2d")
-				if (!ctx) throw new Error("failed to get canvas context")
-
-				ctx.drawImage(frame, 0, 0, frame.displayWidth, frame.displayHeight) // TODO respect aspect ratio
-				frame.close()
-			})
+					ctx.drawImage(frame, 0, 0, frame.displayWidth, frame.displayHeight) // TODO respect aspect ratio
+				})
+			}
+			frame.close()
 		}
 	}
 
