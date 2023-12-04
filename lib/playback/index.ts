@@ -48,6 +48,7 @@ export class Player {
 		const connection = await client.connect()
 
 		const catalog = await Catalog.fetch(connection)
+		console.log("catalog")
 
 		return new Player(connection, catalog)
 	}
@@ -76,8 +77,10 @@ export class Player {
 	async #runInit(name: string) {
 		const sub = await this.#connection.subscribe("", name)
 		try {
+			console.log("preinit")
 			const init = await Promise.race([sub.data(), this.#running])
 			if (!init) throw new Error("no init data")
+			console.log("init")
 		} finally {
 			await sub.close()
 		}

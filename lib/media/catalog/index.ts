@@ -44,6 +44,7 @@ export class Catalog {
 
 			const reader = new Reader(stream)
 			raw = await reader.readAll()
+			console.log("raw", raw)
 
 			await subscribe.close() // we done
 		} catch (e) {
