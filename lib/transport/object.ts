@@ -1,7 +1,7 @@
 import { Reader, Writer } from "./stream.js"
 import { postLogDataAndForget } from "../common/index.js"
 export { Reader, Writer }
-import { WebTransport } from "@fails-components/webtransport"
+import { WebTransport, WebTransportReceiveStream, WebTransportSendStream } from "@fails-components/webtransport"
 
 // This is OBJECT but we can't use that name because it's a reserved word.
 
@@ -22,7 +22,7 @@ export class Objects {
 		this.quic = quic
 	}
 
-	async send(header: Header): Promise<WritableStream<Uint8Array>> {
+	async send(header: Header): Promise<WebTransportSendStream> {
 		const stream = await this.quic.createUnidirectionalStream() //creates a new quic stream
 		header.timestamp = Date.now()
 		await this.#encode(stream, header) //writes object inside stream
@@ -36,7 +36,7 @@ export class Objects {
 		return stream
 	}
 
-	async recv(): Promise<{ stream: ReadableStream<Uint8Array>; header: Header } | undefined> {
+	async recv(): Promise<{ stream: WebTransportReceiveStream; header: Header } | undefined> {
 		const streams = this.quic.incomingUnidirectionalStreams.getReader() //allows to access incoming quic streams
 
 		const { value, done } = await streams.read() //reads all incoming streams one at a time
@@ -45,7 +45,7 @@ export class Objects {
 		if (done) return
 		const stream = value
 
-		const header = await this.#decode(stream as ReadableStream<Uint8Array>) //extracts data from a single stream
+		const header = await this.#decode(stream) //extracts data from a single stream
 		if (header.size) {
 			//throw new Error("TODO: handle OBJECT with size")
 		}
@@ -65,10 +65,10 @@ export class Objects {
 				status: "received",
 			})
 		}
-		return { header, stream: stream as ReadableStream<Uint8Array> }
+		return { header, stream }
 	}
 
-	async #decode(s: ReadableStream<Uint8Array>) {
+	async #decode(s: WebTransportReceiveStream) {
 		const r = new Reader(s)
 
 		const type = await r.u8()
@@ -89,7 +89,7 @@ export class Objects {
 		}
 	}
 
-	async #encode(s: WritableStream<Uint8Array>, h: Header) {
+	async #encode(s: WebTransportSendStream, h: Header) {
 		const w = new Writer(s)
 		await w.u8(h.size ? 2 : 0)
 		await w.u62(h.track)

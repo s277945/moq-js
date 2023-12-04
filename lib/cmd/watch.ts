@@ -6,7 +6,7 @@ import minimist from "minimist"
 
 const argv = minimist(process.argv.slice(2))
 process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = "0"
-
+console.log(argv)
 const PUBLIC_RELAY_HOST = "130.192.16.111:4443"
 const DEFAULT_ID = 1
 const DEFAULT_DURATION = 10000

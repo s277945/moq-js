@@ -1,3 +1,5 @@
+import { WebTransportReceiveStream, WebTransportSendStream } from "@fails-components/webtransport"
+
 const MAX_U6 = Math.pow(2, 6) - 1
 const MAX_U14 = Math.pow(2, 14) - 1
 const MAX_U30 = Math.pow(2, 30) - 1
@@ -7,10 +9,10 @@ const MAX_U62: bigint = 2n ** 62n - 1n
 
 // Reader wraps a stream and provides convience methods for reading pieces from a stream
 export class Reader {
-	#reader: ReadableStream<Uint8Array>
+	#reader: WebTransportReceiveStream
 	#scratch: Uint8Array
 
-	constructor(reader: ReadableStream<Uint8Array>) {
+	constructor(reader: WebTransportReceiveStream) {
 		this.#reader = reader
 		this.#scratch = new Uint8Array(8)
 	}
@@ -93,6 +95,7 @@ export class Reader {
 		const first = this.#scratch[0]
 
 		const size = (first & 0xc0) >> 6
+		console.log(size)
 
 		if (size == 0) {
 			return BigInt(first) & 0x3fn
@@ -119,10 +122,10 @@ export class Reader {
 
 // Writer wraps a stream and writes chunks of data
 export class Writer {
-	#writer: WritableStream<Uint8Array>
+	#writer: WebTransportSendStream
 	#scratch: Uint8Array
 
-	constructor(writer: WritableStream<Uint8Array>) {
+	constructor(writer: WebTransportSendStream) {
 		this.#scratch = new Uint8Array(8)
 		this.#writer = writer
 	}

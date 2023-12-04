@@ -2,6 +2,7 @@ import * as Control from "./control.js"
 import { Queue, Watch } from "../common/async.js"
 import { Objects } from "./object.js"
 import type { Header } from "./object.js"
+import { WebTransportReceiveStream } from "@fails-components/webtransport"
 
 export class Subscriber {
 	// Use to send control messages.
@@ -118,7 +119,7 @@ export class Subscriber {
 		await subscribe.onError(0n, "fin")
 	}
 
-	async recvObject(header: Header, stream: ReadableStream<Uint8Array>) {
+	async recvObject(header: Header, stream: WebTransportReceiveStream) {
 		const subscribe = this.#subscribe.get(header.track)
 		if (!subscribe) {
 			throw new Error(`data for for unknown track: ${header.track}`)
@@ -166,7 +167,7 @@ export class SubscribeSend {
 	readonly track: string
 
 	// A queue of received streams for this subscription.
-	#data = new Queue<{ header: Header; stream: ReadableStream<Uint8Array> }>()
+	#data = new Queue<{ header: Header; stream: WebTransportReceiveStream }>()
 
 	constructor(control: Control.Stream, id: bigint, namespace: string, track: string) {
 		this.#control = control // so we can send messages
@@ -197,7 +198,7 @@ export class SubscribeSend {
 		return await this.#data.abort(err)
 	}
 
-	async onData(header: Header, stream: ReadableStream<Uint8Array>) {
+	async onData(header: Header, stream: WebTransportReceiveStream) {
 		if (!this.#data.closed()) await this.#data.push({ header, stream })
 	}
 

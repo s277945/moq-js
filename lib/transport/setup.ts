@@ -87,6 +87,7 @@ export class Decoder {
 
 		for (let i = 0; i < count; i++) {
 			const id = await this.r.u62()
+			console.log("id:", id)
 			const size = await this.r.u53()
 			const value = await this.r.readExact(size)
 

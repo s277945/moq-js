@@ -3,7 +3,7 @@ import * as Setup from "./setup.js"
 import * as Control from "./control.js"
 import { Objects } from "./object.js"
 import { Connection } from "./connection.js"
-import { WebTransport } from "@fails-components/webtransport"
+import { WebTransport, WebTransportOptions, WebTransportHash } from "@fails-components/webtransport"
 
 export interface ClientConfig {
 	url: string
@@ -37,13 +37,12 @@ export class Client {
 		const fingerprint = await this.#fingerprint
 		if (fingerprint) options.serverCertificateHashes = [fingerprint]
 
-		const quic = new WebTransport(this.config.url)
+		const quic = new WebTransport(this.config.url, options)
 		await quic.ready
 
 		const stream = await quic.createBidirectionalStream()
-
 		const writer = new Stream.Writer(stream.writable)
-		const reader = new Stream.Reader(stream.readable as ReadableStream<Uint8Array>)
+		const reader = new Stream.Reader(stream.readable)
 
 		const setup = new Setup.Stream(reader, writer)
 
