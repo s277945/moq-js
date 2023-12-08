@@ -32,7 +32,7 @@ export class Objects {
 			track: BigInt(header.track).toString(), // converted to string because bigint is not natively supported in JSON
 			status: "sent",
 			sender_ts: header.timestamp,
-			jitter: 1,
+			jitter: 0,
 		})
 		return stream
 	}
@@ -66,6 +66,7 @@ export class Objects {
 				sender_ts: header.timestamp,
 				receiver_ts: ts,
 				status: "received",
+				jitter: 0,
 			})
 		}
 		return { header, stream }

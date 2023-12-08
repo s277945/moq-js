@@ -29,7 +29,7 @@ app.post("/log-init", (req, res) => {
 		// log telemetry string to a new file when new session starts
 		if (getFileStatus(fileName) != 2 && !body.segment) {
 			// if file is not initialized in this session, write file header line
-			if (!getFileStatus(fileName) && fileLogLine("Track ID;Object ID;Group ID;Status;Latency/Jitter;", fileName))
+			if (!getFileStatus(fileName) && fileLogLine("Track ID;Object ID;Group ID;Status;Timestamp;", fileName))
 				console.log("Writing to file:", fileName);
 			else if (!getFileStatus(fileName)) {
 				console.log("Invalid filename provided"); // failed to create new file
@@ -55,10 +55,7 @@ app.post("/log-init", (req, res) => {
 		res.send("POST request received, logger available");
 		if (getFileStatus("log.txt") != 2 && !body.segment) {
 			// if file is not initialized in this session, write file header line
-			if (
-				!getFileStatus("log.txt") &&
-				fileLogLine("Track ID;Object ID;Group ID;Status;Latency/Jitter;", "log.txt")
-			)
+			if (!getFileStatus("log.txt") && fileLogLine("Track ID;Object ID;Group ID;Status;Timestamp;", "log.txt"))
 				console.log("Writing to file:", "log.txt");
 			else if (!getFileStatus("log.txt")) {
 				console.log("Invalid filename provided"); // failed to create new file
@@ -89,11 +86,14 @@ app.post("/log-data", (req, res) => {
 	if (data && data.object != undefined && data.group != undefined && data.track != undefined) {
 		// create log string
 		let str = "";
+		// add track, object and group to log string
 		if (data.status != undefined || data.latency != undefined)
 			str += data.track + ";" + data.object + ";" + data.group;
+		// add status and timestamp to log string
 		if (data.status != undefined) {
 			str += ";" + data.status;
-			if (data.status === "sent")
+			if (data.status === "sent") {
+				if (data.sender_ts != undefined) str += ";" + data.sender_ts;
 				if (data.jitter != undefined) {
 					str += ";" + data.jitter;
 					console.log(
@@ -105,32 +105,69 @@ app.post("/log-data", (req, res) => {
 							data.track +
 							", sender jitter: " +
 							data.jitter,
+						"ms",
 					);
 				} else console.log("Sent object", data.object + " of group " + data.group + " of track " + data.track);
-		}
-		if (data.latency != undefined) {
-			str += ";" + data.latency;
-			console.log(
-				"Latency for object",
-				data.object +
-					" of group " +
-					data.group +
-					" of track " +
-					data.track +
-					(data.latency ? " : " + data.latency + " ms" : ""),
-			);
-		} else if (data.sender_ts != undefined && data.receiver_ts != undefined) {
-			const latency = data.receiver_ts > data.sender_ts ? data.receiver_ts - data.sender_ts : undefined;
-			str += ";" + latency;
-			console.log(
-				"Latency for object",
-				data.object +
-					" of group " +
-					data.group +
-					" of track " +
-					data.track +
-					(latency ? " : " + latency + " ms" : "could not be computed"),
-			);
+			}
+			if (data.status === "received") {
+				if (data.receiver_ts != undefined) str += ";" + data.receiver_ts;
+				// add latency to log string if latency is to be logged instead of timestamps
+				if (data.latency != undefined) {
+					if (data.sender_ts === undefined && data.receiver_ts === undefined) {
+						str += ";" + data.latency;
+					}
+					// print latency data if received
+					if (data.jitter != undefined) {
+						str += ";" + data.jitter;
+						console.log(
+							"Latency for object",
+							data.object +
+								" of group " +
+								data.group +
+								" of track " +
+								data.track +
+								(data.latency ? " : " + data.latency + " ms" : ""),
+							", receiver jitter: " + data.jitter,
+							"ms",
+						);
+					} else
+						console.log(
+							"Latency for object",
+							data.object +
+								" of group " +
+								data.group +
+								" of track " +
+								data.track +
+								(data.latency ? " : " + data.latency + " ms" : ""),
+						);
+				} else if (data.sender_ts != undefined && data.receiver_ts != undefined) {
+					// compute and print latency data from timestamps if received
+					const latency = data.receiver_ts > data.sender_ts ? data.receiver_ts - data.sender_ts : undefined;
+					if (data.jitter != undefined) {
+						str += ";" + data.jitter;
+						console.log(
+							"Latency for object",
+							data.object +
+								" of group " +
+								data.group +
+								" of track " +
+								data.track +
+								(latency ? " : " + latency + " ms" : "could not be computed"),
+							", receiver jitter: " + data.jitter,
+							"ms",
+						);
+					} else
+						console.log(
+							"Latency for object",
+							data.object +
+								" of group " +
+								data.group +
+								" of track " +
+								data.track +
+								(latency ? " : " + latency + " ms" : "could not be computed"),
+						);
+				}
+			}
 		}
 		if (str !== "") fileLogLine(str, filename); // log telemetry string to file
 		// log telemetry data to console

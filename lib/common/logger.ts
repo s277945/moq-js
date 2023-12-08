@@ -10,7 +10,8 @@ function loggerServerStatus(newStatus?: number): number {
 }
 
 let fileName = "log.txt"
-let lastTimestamp: number // individual timestamp value valid for main thread or worker
+let lastTimestamp: number // timestamp value valid for main thread or individual worker
+let lastDelta: number // delta value valid for main thread or individual worker
 
 // format for latency data
 export interface LogData {
@@ -78,9 +79,16 @@ export function getCachedLoggerStatus(): boolean {
 // function to post logger data in LogData format in fire and forget manner
 export function postLogDataAndForget(data: LogData): void {
 	// calculate packet jitter if data is available
-	if (data.jitter) data.jitter = lastTimestamp && data.sender_ts ? data.sender_ts - lastTimestamp : 0
+	if (data.jitter != undefined) {
+		if (lastTimestamp != undefined && data.sender_ts != undefined) {
+			if (lastDelta === undefined) data.jitter = 0
+			else data.jitter = +Math.abs(data.sender_ts - lastTimestamp - lastDelta).toFixed(2)
+			lastDelta = data.sender_ts - lastTimestamp
+		}
+	}
 	// save last timestamp if available
 	if (data.sender_ts) lastTimestamp = data.sender_ts
+
 	//send log data
 	if (data && loggerServerStatus() == 1)
 		fetch("http://localhost:3000/log-data", {
