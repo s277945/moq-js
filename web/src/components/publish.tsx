@@ -10,8 +10,8 @@ const AUDIO_CODECS = [
 	"mp4a", // TODO support AAC
 ]
 
-const AUDIO_BITRATE = 0
-const VIDEO_BITRATE = 0
+const AUDIO_BITRATE = 128000
+const VIDEO_BITRATE = 512000
 interface VideoCodec {
 	name: string
 	profile: string

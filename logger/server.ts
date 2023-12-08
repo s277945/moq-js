@@ -20,7 +20,7 @@ app.get("/latency-data", (req, res) => {
 });
 
 //POST response for localhost:/latency-init
-app.post("/latency-init", (req, res) => {
+app.post("/log-init", (req, res) => {
 	//console.log("POST request received from:", req.ip == "::1" ? "localhost" : req.ip);
 	const body = req.body;
 	if (body && body.role && body.fileName) {
@@ -29,7 +29,7 @@ app.post("/latency-init", (req, res) => {
 		// log telemetry string to a new file when new session starts
 		if (getFileStatus(fileName) != 2 && !body.segment) {
 			// if file is not initialized in this session, write file header line
-			if (!getFileStatus(fileName) && fileLogLine("Track ID;Object ID;Group ID;Status;Latency;", fileName))
+			if (!getFileStatus(fileName) && fileLogLine("Track ID;Object ID;Group ID;Status;Latency/Jitter;", fileName))
 				console.log("Writing to file:", fileName);
 			else if (!getFileStatus(fileName)) {
 				console.log("Invalid filename provided"); // failed to create new file
@@ -55,7 +55,10 @@ app.post("/latency-init", (req, res) => {
 		res.send("POST request received, logger available");
 		if (getFileStatus("log.txt") != 2 && !body.segment) {
 			// if file is not initialized in this session, write file header line
-			if (!getFileStatus("log.txt") && fileLogLine("Track ID;Object ID;Group ID;Status;Latency;", "log.txt"))
+			if (
+				!getFileStatus("log.txt") &&
+				fileLogLine("Track ID;Object ID;Group ID;Status;Latency/Jitter;", "log.txt")
+			)
 				console.log("Writing to file:", "log.txt");
 			else if (!getFileStatus("log.txt")) {
 				console.log("Invalid filename provided"); // failed to create new file
@@ -80,7 +83,7 @@ app.post("/latency-init", (req, res) => {
 });
 
 //POST response for localhost:/latency-data
-app.post("/latency-data", (req, res) => {
+app.post("/log-data", (req, res) => {
 	const data = req.body.data;
 	const filename = req.body.fileName;
 	if (data && data.object != undefined && data.group != undefined && data.track != undefined) {
@@ -91,7 +94,19 @@ app.post("/latency-data", (req, res) => {
 		if (data.status != undefined) {
 			str += ";" + data.status;
 			if (data.status === "sent")
-				console.log("Sent object", data.object + " of group " + data.group + " of track " + data.track);
+				if (data.jitter != undefined) {
+					str += ";" + data.jitter;
+					console.log(
+						"Sent object",
+						data.object +
+							" of group " +
+							data.group +
+							" of track " +
+							data.track +
+							", sender jitter: " +
+							data.jitter,
+					);
+				} else console.log("Sent object", data.object + " of group " + data.group + " of track " + data.track);
 		}
 		if (data.latency != undefined) {
 			str += ";" + data.latency;
@@ -103,6 +118,18 @@ app.post("/latency-data", (req, res) => {
 					" of track " +
 					data.track +
 					(data.latency ? " : " + data.latency + " ms" : ""),
+			);
+		} else if (data.sender_ts != undefined && data.receiver_ts != undefined) {
+			const latency = data.receiver_ts > data.sender_ts ? data.receiver_ts - data.sender_ts : undefined;
+			str += ";" + latency;
+			console.log(
+				"Latency for object",
+				data.object +
+					" of group " +
+					data.group +
+					" of track " +
+					data.track +
+					(latency ? " : " + latency + " ms" : "could not be computed"),
 			);
 		}
 		if (str !== "") fileLogLine(str, filename); // log telemetry string to file
@@ -120,7 +147,7 @@ app.post("/skipped-segment", (req, res) => {
 			const track = req.body.track;
 			const filename = req.body.fileName;
 			// create log string
-			const str = track + ";" + id + ";0;" + reason;
+			const str = track + ";0;" + id + ";" + reason;
 			fileLogLine(str, filename); // log telemetry string to file
 			// log telemetry data to console
 			console.log("Skipped segment", id, "of track", track, ":", reason);
@@ -130,7 +157,7 @@ app.post("/skipped-segment", (req, res) => {
 });
 
 //POST response for localhost:/latency-data-end
-app.post("/latency-data-end", (req, res) => {
+app.post("/log-end", (req, res) => {
 	const data = req.body;
 	if (data.playerClosed) {
 		fileLogLine("/n" + "// Player session ended //"); // log data to file

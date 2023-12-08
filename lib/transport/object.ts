@@ -31,6 +31,8 @@ export class Objects {
 			group: header.group,
 			track: BigInt(header.track).toString(), // converted to string because bigint is not natively supported in JSON
 			status: "sent",
+			sender_ts: header.timestamp,
+			jitter: 1,
 		})
 		return stream
 	}
@@ -51,16 +53,18 @@ export class Objects {
 		//console.log("received object: ", header) //object received log
 		if (header.timestamp) {
 			// if object timestamp is present, calculate and print latency
-			const latency = Date.now() - header.timestamp
+			// const latency = Date.now() - header.timestamp
 			//console.log("Latency for object ", header.object, "of group", header.group, ":", latency, "ms")
 			// send latency data to logger server
+			const ts = Date.now()
 			// if (latency <= 500)
 			// maximum object latency to log, objects with higher latency are ignored
 			postLogDataAndForget({
 				object: header.object,
 				group: header.group,
 				track: BigInt(header.track).toString(), // converted to string because bigint is not natively supported in JSON
-				latency: latency,
+				sender_ts: header.timestamp,
+				receiver_ts: ts,
 				status: "received",
 			})
 		}

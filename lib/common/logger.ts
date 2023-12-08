@@ -10,12 +10,16 @@ function loggerServerStatus(newStatus?: number): number {
 }
 
 let fileName = "log.txt"
+let lastTimestamp: number // individual timestamp value valid for main thread or worker
 
 // format for latency data
 export interface LogData {
 	object: number
 	group: number
 	track: string
+	sender_ts?: number
+	receiver_ts?: number
+	jitter?: number
 	latency?: number
 	status: string
 }
@@ -47,7 +51,7 @@ export function getLoggerStatus(): void {
 }
 // function to get logger server status
 export function initLoggerFile(role: string, fName?: string, segment?: boolean): void {
-	fetch("http://localhost:3000/latency-init", {
+	fetch("http://localhost:3000/log-init", {
 		method: "POST",
 		body: fName ? JSON.stringify({ fileName: fName, role: role, segment: segment ? true : false }) : "",
 		headers: { "Content-Type": "application/json" },
@@ -71,10 +75,15 @@ export function initLoggerFile(role: string, fName?: string, segment?: boolean):
 export function getCachedLoggerStatus(): boolean {
 	return loggerServerStatus() == (0 | 2) ? false : true
 }
-// function to post latency in LogData format in fire and forget manner
+// function to post logger data in LogData format in fire and forget manner
 export function postLogDataAndForget(data: LogData): void {
+	// calculate packet jitter if data is available
+	if (data.jitter) data.jitter = lastTimestamp && data.sender_ts ? data.sender_ts - lastTimestamp : 0
+	// save last timestamp if available
+	if (data.sender_ts) lastTimestamp = data.sender_ts
+	//send log data
 	if (data && loggerServerStatus() == 1)
-		fetch("http://localhost:3000/latency-data", {
+		fetch("http://localhost:3000/log-data", {
 			method: "POST",
 			body: JSON.stringify({ data: data, fileName: fileName }),
 			headers: { "Content-Type": "application/json" },
@@ -94,7 +103,7 @@ export function postSkippedSegmentIdAndForget(skipped: SkippedSegmentData): void
 // function to signal client player closure to logger
 export function postLogDataEnd(): void {
 	if (loggerServerStatus() == 1)
-		fetch("http://localhost:3000/latency-data-end", {
+		fetch("http://localhost:3000/log-end", {
 			method: "POST",
 			body: JSON.stringify({ playerClosed: true }),
 			headers: { "Content-Type": "application/json" },
