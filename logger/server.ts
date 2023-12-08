@@ -103,7 +103,7 @@ app.post("/log-data", (req, res) => {
 							data.group +
 							" of track " +
 							data.track +
-							", sender jitter: " +
+							", jitter: " +
 							data.jitter,
 						"ms",
 					);
@@ -127,7 +127,7 @@ app.post("/log-data", (req, res) => {
 								" of track " +
 								data.track +
 								(data.latency ? " : " + data.latency + " ms" : ""),
-							", receiver jitter: " + data.jitter,
+							", jitter: " + data.jitter,
 							"ms",
 						);
 					} else

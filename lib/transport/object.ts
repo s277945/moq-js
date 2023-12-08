@@ -66,7 +66,7 @@ export class Objects {
 				sender_ts: header.timestamp,
 				receiver_ts: ts,
 				status: "received",
-				jitter: 0,
+				// jitter: 0,
 			})
 		}
 		return { header, stream }
