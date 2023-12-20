@@ -51,12 +51,16 @@ function createLogger(fname: string): Logger | undefined {
 
 class Logger {
 	private filename: string;
+	private audioId?: number;
+	private videoId?: number;
 
-	constructor(fname: string) {
+	constructor(fname: string, audioId?: number, videoId?: number) {
 		this.filename = fname;
 		writeFileSync(join(join(dirname(dirname(dirname(__dirname))), "logs"), this.filename), "", {
 			flag: "w",
 		});
+		this.audioId = audioId;
+		this.videoId = videoId;
 	}
 
 	public write(data: any) {

@@ -174,7 +174,21 @@ app.post("/log-data", (req, res) => {
 	} else console.log("Unexpected data format :", req.body); // log raw data to console if unexpected format
 	res.send("Received POST request for telemetry data");
 });
-
+//POST response for localhost:/log-track-types
+app.post("/log-track-types", (req, res) => {
+	if (req.body && (req.body.audio || req.body.video)) {
+		const audio = req.body.audio;
+		const video = req.body.video;
+		const filename = req.body.fileName;
+		// create log string
+		const str = (audio ? audio + ";-;-;AUDIO;-;\n" : "") + (video ? video + ";-;-;VIDEO;-;\n" : "");
+		fileLog(str, filename ? filename : "log.txt"); // log telemetry string to file
+		// log telemetry data to console
+		if (audio) console.log("Received track info: id", audio, "for audio track");
+		if (video) console.log("Received track info: id", video, "for video track");
+	} else console.log("Unexpected data format :", req.body); // log raw data to console if unexpected format
+	res.send("Received POST request for track info data");
+});
 //POST response for localhost:/skipped-segment
 app.post("/skipped-segment", (req, res) => {
 	if (req.body) {

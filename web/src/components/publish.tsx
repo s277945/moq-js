@@ -4,6 +4,7 @@ import { initLoggerFile, getCachedLoggerStatus } from "@kixelated/moq/common"
 import { createSignal, createEffect, onCleanup, createMemo, Show, For, createSelector, Switch, Match } from "solid-js"
 
 import Fail from "./fail"
+import { logTrackTypes } from "@kixelated/moq/common/logger"
 
 const AUDIO_CODECS = [
 	"Opus",
@@ -149,6 +150,9 @@ export default function Publish() {
 		if (!v && videoTrack()) {
 			throw new Error("no supported video codec")
 		}
+
+		// eslint-disable-next-line @typescript-eslint/no-unsafe-call
+		logTrackTypes(a ? (v ? 3 : 2) : -1, v ? (a ? 4 : 2) : -1)
 
 		return new Broadcast({
 			connection: c,

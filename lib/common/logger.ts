@@ -72,6 +72,15 @@ export function initLoggerFile(role: string, fName?: string, segment?: boolean):
 			console.log("Logger server unreachable, status:", loggerServerStatus(2))
 		})
 }
+//function to log track types
+export function logTrackTypes(audio?: number, video?: number): void {
+	if (loggerServerStatus() == 1)
+		fetch("http://localhost:3000/log-track-types", {
+			method: "POST",
+			body: JSON.stringify({ audio: audio ? audio : "-1", video: video ? video : "-1", fileName: fileName }),
+			headers: { "Content-Type": "application/json" },
+		})
+}
 // function to get cached logger server status
 export function getCachedLoggerStatus(): boolean {
 	return loggerServerStatus() == (0 | 2) ? false : true
