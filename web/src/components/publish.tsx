@@ -152,7 +152,10 @@ export default function Publish() {
 		}
 
 		// eslint-disable-next-line @typescript-eslint/no-unsafe-call
-		logTrackTypes(a ? (v ? 3 : 2) : -1, v ? (a ? 4 : 2) : -1)
+		logTrackTypes(
+			audioTrack() ? (videoTrack() ? 3 : 2) : undefined,
+			videoTrack() ? (audioTrack() ? 4 : 2) : undefined,
+		)
 
 		return new Broadcast({
 			connection: c,

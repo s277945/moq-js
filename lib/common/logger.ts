@@ -77,7 +77,7 @@ export function logTrackTypes(audio?: number, video?: number): void {
 	if (loggerServerStatus() == 1)
 		fetch("http://localhost:3000/log-track-types", {
 			method: "POST",
-			body: JSON.stringify({ audio: audio ? audio : "-1", video: video ? video : "-1", fileName: fileName }),
+			body: JSON.stringify({ audio: audio, video: video, fileName: fileName }),
 			headers: { "Content-Type": "application/json" },
 		})
 }
