@@ -11,7 +11,7 @@ const AUDIO_CODECS = [
 	"mp4a", // TODO support AAC
 ]
 
-const AUDIO_BITRATE = 0
+const AUDIO_BITRATE = 128000
 const VIDEO_BITRATE = 512000
 interface VideoCodec {
 	name: string
@@ -76,6 +76,8 @@ export default function Publish() {
 	const urlSearchParams = new URLSearchParams(window.location.search)
 	const params = Object.fromEntries(urlSearchParams.entries())
 	const server = params.server ?? import.meta.env.PUBLIC_RELAY_HOST
+	const noVideoRenderingParam = urlSearchParams.get("noVideoRender") ?? "false"
+	const noVideoRendering = noVideoRenderingParam == "true" ? true : false
 
 	const [device, setDevice] = createSignal<MediaStream | undefined>()
 	const [deviceLoading, setDeviceLoading] = createSignal(false)
@@ -153,7 +155,7 @@ export default function Publish() {
 
 		// eslint-disable-next-line @typescript-eslint/no-unsafe-call
 		logTrackTypes(
-			audioTrack() ? (videoTrack() ? 3 : 2) : undefined,
+			audioTrack() ? (videoTrack() && !noVideoRendering ? 3 : 2) : undefined,
 			videoTrack() ? (audioTrack() ? 4 : 2) : undefined,
 		)
 
@@ -234,6 +236,7 @@ export default function Publish() {
 		if (getCachedLoggerStatus()) {
 			absolute += "&logFileName=" + loggerFileName
 		}
+		if (noVideoRendering) absolute += "&noVideoRender=true"
 		navigator.clipboard
 			.writeText(absolute)
 			.then(() => setCopied(true))

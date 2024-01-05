@@ -10,6 +10,10 @@ export default function Watch(props: { name: string }) {
 	// Use query params to allow overriding environment variables.
 	const urlSearchParams = new URLSearchParams(window.location.search)
 	const params = Object.fromEntries(urlSearchParams.entries())
+	console.log(urlSearchParams)
+	for (const entry in urlSearchParams.entries()) {
+		console.log(entry)
+	}
 	const server = params.server ?? import.meta.env.PUBLIC_RELAY_HOST
 
 	const defaultMode = "VideoDecoder" in window ? "webcodecs" : "mse"
@@ -35,24 +39,31 @@ export default function Watch(props: { name: string }) {
 
 	const [usePlayer, setPlayer] = createSignal<Player | undefined>()
 	createEffect(() => {
-		const urlParams = `https://${server}/${props.name}`.split("&")
+		const urlParams = `https://${server}/${props.name}`.split(/&(.*)/s)
 		const url = urlParams[0]
+		const urlSearchParams = new URLSearchParams(urlParams[1])
 		const today = new Date()
 		const date = today.getFullYear() + "-" + (today.getMonth() + 1) + "-" + today.getDate()
 		const time = today.getHours() + "." + today.getMinutes() + "." + today.getSeconds()
 		const dateTime = date + "_" + time
+
+		const noVideoRenderingParam = urlSearchParams.get("noVideoRender") ?? "false"
+		const noVideoRendering = noVideoRenderingParam == "true" ? true : false
+		//log filename is derived from current date and time if not provided in url parameter
+		const loggerFileName = urlSearchParams.get("logFileName") ?? "log_" + dateTime + ".txt"
+		console.log(urlSearchParams.get("logFileName"))
 
 		// Special case localhost to fetch the TLS fingerprint from the server.
 		// TODO remove this when WebTransport correctly supports self-signed certificates
 		const fingerprint = server ? `https://${server}/fingerprint` : undefined
 
 		const element = useElement()
-		//log filename is derived from current date and time
-		const loggerFileName = urlParams[1] ? urlParams[1].replace("logFileName=", "") : "log_" + dateTime + ".txt"
 		initLoggerFile("Subscriber", loggerFileName) // init logger server and check status
 		console.log(url)
 
-		Player.create({ url, fingerprint, element, logger: loggerFileName }).then(setPlayer).catch(setError)
+		Player.create({ url, fingerprint, element, logger: loggerFileName, noVideoRender: noVideoRendering })
+			.then(setPlayer)
+			.catch(setError)
 	})
 
 	createEffect(() => {

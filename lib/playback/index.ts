@@ -1,7 +1,7 @@
 import * as Message from "./webcodecs/message"
 
 import { Connection } from "../transport/connection"
-import { Catalog, isAudioTrack, isMp4Track, Mp4Track } from "../media/catalog"
+import { Catalog, isAudioTrack, isMp4Track, isVideoTrack, Mp4Track } from "../media/catalog"
 import { asError } from "../common/error"
 
 // We support two different playback implementations:
@@ -17,6 +17,7 @@ export interface PlayerConfig {
 	fingerprint?: string // URL to fetch TLS certificate fingerprint
 	element: HTMLCanvasElement | HTMLVideoElement
 	logger?: string
+	noVideoRender?: boolean
 }
 
 // This class must be created on the main thread due to AudioContext.
@@ -28,6 +29,7 @@ export class Player {
 
 	#connection: Connection
 	#catalog: Catalog
+	#noVideoRender: boolean | undefined
 
 	// Running is a promise that resolves when the player is closed.
 	// #close is called with no error, while #abort is called with an error.
@@ -35,10 +37,11 @@ export class Player {
 	#close!: () => void
 	#abort!: (err: Error) => void
 
-	private constructor(connection: Connection, catalog: Catalog, backend: Webcodecs | MSE) {
+	private constructor(connection: Connection, catalog: Catalog, backend: Webcodecs | MSE, noVideoRender?: boolean) {
 		this.#connection = connection
 		this.#catalog = catalog
 		this.#backend = backend
+		this.#noVideoRender = noVideoRender
 
 		const abort = new Promise<void>((resolve, reject) => {
 			this.#close = resolve
@@ -64,7 +67,7 @@ export class Player {
 			backend = new MSE({ element: config.element })
 		}
 
-		return new Player(connection, catalog, backend)
+		return new Player(connection, catalog, backend, config.noVideoRender ?? undefined)
 	}
 
 	async #run() {
@@ -80,9 +83,15 @@ export class Player {
 				// TODO temporary hack to disable audio in MSE
 				continue
 			}
-
-			inits.add(track.init_track)
-			tracks.push(track)
+			if (isVideoTrack(track)) {
+				if (!this.#noVideoRender) {
+					inits.add(track.init_track)
+					tracks.push(track)
+				}
+			} else {
+				inits.add(track.init_track)
+				tracks.push(track)
+			}
 		}
 
 		// Call #runInit on each unique init track
