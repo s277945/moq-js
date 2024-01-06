@@ -9,9 +9,13 @@ function loggerServerStatus(newStatus?: number): number {
 	return Atomics.load(uint8, 0)
 }
 
+interface jitterData {
+	lastTimestamp?: number // timestamp value valid for main thread or individual worker
+	lastDelta?: number // delta value valid for main thread or individual worker
+}
+
 let fileName = "log.txt"
-let lastTimestamp: number // timestamp value valid for main thread or individual worker
-let lastDelta: number // delta value valid for main thread or individual worker
+let lastTimestampMap = new Map<string, jitterData>()
 
 // format for latency data
 export interface LogData {
@@ -74,12 +78,16 @@ export function initLoggerFile(role: string, fName?: string, segment?: boolean):
 }
 //function to log track types
 export function logTrackTypes(audio?: number, video?: number): void {
-	if (loggerServerStatus() == 1)
+	if (loggerServerStatus() == 1) {
 		fetch("http://localhost:3000/log-track-types", {
 			method: "POST",
 			body: JSON.stringify({ audio: audio, video: video, fileName: fileName }),
 			headers: { "Content-Type": "application/json" },
 		})
+		if (audio) lastTimestampMap.set(`${audio}`, { lastDelta: undefined, lastTimestamp: undefined })
+		if (video) lastTimestampMap.set(`${video}`, { lastDelta: undefined, lastTimestamp: undefined })
+		console.log(lastTimestampMap.has(`${audio}`), lastTimestampMap.has(`${video}`))
+	}
 }
 // function to get cached logger server status
 export function getCachedLoggerStatus(): boolean {
@@ -89,14 +97,23 @@ export function getCachedLoggerStatus(): boolean {
 export function postLogDataAndForget(data: LogData): void {
 	// calculate packet jitter if data is available
 	if (data.jitter != undefined) {
+		let lastTimestamp = lastTimestampMap.get(data.track)?.lastTimestamp
+		let lastDelta = lastTimestampMap.get(data.track)?.lastDelta
+		console.log(lastTimestamp, lastDelta)
 		if (lastTimestamp != undefined && data.sender_ts != undefined) {
 			if (lastDelta === undefined) data.jitter = 0
-			else data.jitter = +Math.abs(data.sender_ts - lastTimestamp - lastDelta).toFixed(2)
+			else data.jitter = Math.abs(data.sender_ts - lastTimestamp - lastDelta)
+			// console.log(data.sender_ts - lastTimestamp)
+			// if (lastDelta) console.log(data.sender_ts - lastTimestamp - lastDelta)
 			lastDelta = data.sender_ts - lastTimestamp
+			lastTimestampMap.set(data.track, { lastTimestamp: lastTimestamp, lastDelta: lastDelta })
 		}
 	}
 	// save last timestamp if available
-	if (data.sender_ts) lastTimestamp = data.sender_ts
+	if (data.sender_ts) {
+		let lastDelta = lastTimestampMap.get(data.track)?.lastDelta
+		lastTimestampMap.set(data.track, { lastTimestamp: data.sender_ts, lastDelta: lastDelta })
+	}
 
 	//send log data
 	if (data && loggerServerStatus() == 1)
