@@ -83,15 +83,8 @@ export class Player {
 				// TODO temporary hack to disable audio in MSE
 				continue
 			}
-			if (isVideoTrack(track)) {
-				if (!this.#noVideoRender) {
-					inits.add(track.init_track)
-					tracks.push(track)
-				}
-			} else {
-				inits.add(track.init_track)
-				tracks.push(track)
-			}
+			inits.add(track.init_track)
+			tracks.push(track)
 		}
 
 		// Call #runInit on each unique init track
@@ -125,12 +118,14 @@ export class Player {
 				const segment = await Promise.race([sub.data(), this.#running])
 				if (!segment) break
 
-				this.#backend.segment({
-					init: track.init_track,
-					kind: track.kind,
-					header: segment.header,
-					stream: segment.stream,
-				})
+				if (track.kind == "audio" || (!this.#noVideoRender && track.kind == "video")) {
+					this.#backend.segment({
+						init: track.init_track,
+						kind: track.kind,
+						header: segment.header,
+						stream: segment.stream,
+					})
+				}
 			}
 		} finally {
 			await sub.close()
