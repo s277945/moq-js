@@ -1,6 +1,6 @@
 import express from "express";
 import cors from "cors";
-import { fileLog, fileLogLine } from "./api/logger";
+import { fileLog, fileLogLine, logCPUData } from "./api/logger";
 import { setFileStatus, getFileStatus } from "./api/file_status";
 
 const app = express();
@@ -40,15 +40,19 @@ app.post("/log-init", (req, res) => {
 				setFileStatus(fileName, 2);
 				fileLogLine("-;-;-;SUBSCRIBER START;-;", fileName);
 				console.log("// Subscriber session started //");
+				logCPUData(fileName);
 			} else if (body.role == "Publisher") {
 				// if publisher log init, log publisher start and set status to 2
 				setFileStatus(fileName, 1);
 				console.log("// Publisher session started //");
 				fileLogLine("-;-;-;PUBLISHER START;-;", fileName);
+				logCPUData(fileName);
 			}
 		} else if (!body.segment && body.role == "Subscriber") {
 			// for now one subscriber at a time for a file
 			fileLogLine("-;-;-;SUBSCRIBER RESTART;-;", fileName); // log telemetry string to file when new session starts
+			const tsnow = Date.now();
+			logCPUData(fileName);
 		}
 	} else {
 		// log filename not specified
@@ -66,15 +70,18 @@ app.post("/log-init", (req, res) => {
 				setFileStatus("log.txt", 2);
 				fileLogLine("-;-;-;SUBSCRIBER START;-;", "log.txt");
 				console.log("// Subscriber session started //");
+				logCPUData("log.txt");
 			} else if (body.role == "Publisher") {
 				// if publisher log init, log publisher start and set status to 2
 				setFileStatus("log.txt", 1);
 				console.log("// Publisher session started //");
 				fileLogLine("-;-;-;PUBLISHER START;-;", "log.txt");
+				logCPUData("log.txt");
 			}
 		} else if (!body.segment && body.role == "Subscriber") {
 			// for now one subscriber at a time for a file
 			fileLogLine("-;-;-;SUBSCRIBER RESTART;-;", "log.txt"); // log telemetry string to file when new session starts
+			logCPUData("log.txt");
 		}
 	}
 });
@@ -169,7 +176,10 @@ app.post("/log-data", (req, res) => {
 				}
 			}
 		}
-		if (str !== "") fileLogLine(str, filename); // log telemetry string to file
+		if (str !== "") {
+			fileLogLine(str, filename); // log telemetry string to file
+			logCPUData(filename);
+		}
 		// log telemetry data to console
 	} else console.log("Unexpected data format :", req.body); // log raw data to console if unexpected format
 	res.send("Received POST request for telemetry data");
@@ -200,6 +210,7 @@ app.post("/skipped-segment", (req, res) => {
 			// create log string
 			const str = track + ";0;" + id + ";" + reason;
 			fileLogLine(str, filename); // log telemetry string to file
+			logCPUData(filename);
 			// log telemetry data to console
 			console.log("Skipped segment", id, "of track", track, ":", reason);
 		} else console.log("Unexpected data format :", req.body); // log raw data to console if unexpected format
@@ -220,7 +231,9 @@ app.post("/log-end", (req, res) => {
 //POST response for localhost:/latency-string
 app.post("/latency-string", (req, res) => {
 	const data = req.body;
-	if (data.str) fileLogLine(data.str); // log telemetry data to file
+	if (data.str) {
+		fileLogLine(data.str); // log telemetry data to file
+	}
 	console.log(req.body); // log telemetry data to console
 	res.send("Received POST request for telemetry data");
 });

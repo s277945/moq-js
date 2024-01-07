@@ -1,8 +1,26 @@
 import { appendFileSync, writeFileSync } from "fs";
 import { join, dirname, basename } from "path";
+import osu from "node-os-utils";
 
 let loggers: Map<string, Logger>;
 // loggers is a structure that contains all initialized loggers
+
+const cpu = osu.cpu;
+let prevTS = 0; // previous saved timestamp for cpu data logging
+const TSDELTA = 100; // cpu data logging interval
+
+export function logCPUData(fileName: string) {
+	// function to log CPU usage metrics after a minimum delta of time has passed
+	const tsnow = Date.now();
+	if (tsnow - prevTS >= TSDELTA) {
+		cpu.usage().then((cpuPercentage) => {
+			console.log("CPU usage at", cpuPercentage, "%");
+			const ts = Date.now();
+			fileLogLine("-;-;" + ts + ";CPU;" + cpuPercentage, fileName);
+		});
+		prevTS = tsnow;
+	}
+}
 
 export function fileLog(data: any, fileName?: string): boolean {
 	//create logger map variable if not already initialized
