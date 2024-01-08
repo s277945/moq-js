@@ -1,7 +1,12 @@
 import express from "express";
 import cors from "cors";
-import { fileLog, fileLogLine, logCPUData } from "./api/logger";
+import { fileLog, fileLogLine, logAdditionalData, AdditionalLogConfig } from "./api/logger";
 import { setFileStatus, getFileStatus } from "./api/file_status";
+
+const ADDITIONAL_DATA_CONFIG: AdditionalLogConfig = {
+	cpu: true,
+	net: false,
+};
 
 const app = express();
 //enable cors for localhost app
@@ -40,19 +45,19 @@ app.post("/log-init", (req, res) => {
 				setFileStatus(fileName, 2);
 				fileLogLine("-;-;-;SUBSCRIBER START;-;", fileName);
 				console.log("// Subscriber session started //");
-				logCPUData(fileName);
+				logAdditionalData(fileName, ADDITIONAL_DATA_CONFIG);
 			} else if (body.role == "Publisher") {
 				// if publisher log init, log publisher start and set status to 2
 				setFileStatus(fileName, 1);
 				console.log("// Publisher session started //");
 				fileLogLine("-;-;-;PUBLISHER START;-;", fileName);
-				logCPUData(fileName);
+				logAdditionalData(fileName, ADDITIONAL_DATA_CONFIG);
 			}
 		} else if (!body.segment && body.role == "Subscriber") {
 			// for now one subscriber at a time for a file
 			fileLogLine("-;-;-;SUBSCRIBER RESTART;-;", fileName); // log telemetry string to file when new session starts
 			const tsnow = Date.now();
-			logCPUData(fileName);
+			logAdditionalData(fileName, ADDITIONAL_DATA_CONFIG);
 		}
 	} else {
 		// log filename not specified
@@ -70,18 +75,18 @@ app.post("/log-init", (req, res) => {
 				setFileStatus("log.txt", 2);
 				fileLogLine("-;-;-;SUBSCRIBER START;-;", "log.txt");
 				console.log("// Subscriber session started //");
-				logCPUData("log.txt");
+				logAdditionalData("log.txt", ADDITIONAL_DATA_CONFIG);
 			} else if (body.role == "Publisher") {
 				// if publisher log init, log publisher start and set status to 2
 				setFileStatus("log.txt", 1);
 				console.log("// Publisher session started //");
 				fileLogLine("-;-;-;PUBLISHER START;-;", "log.txt");
-				logCPUData("log.txt");
+				logAdditionalData("log.txt", ADDITIONAL_DATA_CONFIG);
 			}
 		} else if (!body.segment && body.role == "Subscriber") {
 			// for now one subscriber at a time for a file
 			fileLogLine("-;-;-;SUBSCRIBER RESTART;-;", "log.txt"); // log telemetry string to file when new session starts
-			logCPUData("log.txt");
+			logAdditionalData("log.txt", ADDITIONAL_DATA_CONFIG);
 		}
 	}
 });
@@ -178,7 +183,7 @@ app.post("/log-data", (req, res) => {
 		}
 		if (str !== "") {
 			fileLogLine(str, filename); // log telemetry string to file
-			logCPUData(filename);
+			logAdditionalData(filename, ADDITIONAL_DATA_CONFIG);
 		}
 		// log telemetry data to console
 	} else console.log("Unexpected data format :", req.body); // log raw data to console if unexpected format
@@ -210,7 +215,7 @@ app.post("/skipped-segment", (req, res) => {
 			// create log string
 			const str = track + ";0;" + id + ";" + reason;
 			fileLogLine(str, filename); // log telemetry string to file
-			logCPUData(filename);
+			logAdditionalData(filename, ADDITIONAL_DATA_CONFIG);
 			// log telemetry data to console
 			console.log("Skipped segment", id, "of track", track, ":", reason);
 		} else console.log("Unexpected data format :", req.body); // log raw data to console if unexpected format
