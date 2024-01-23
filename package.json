@@ -5,7 +5,8 @@
 	"workspaces": [
 		"lib",
 		"logger",
-		"web"
+		"web",
+		"tester"
 	],
 	"scripts": {
 		"start": "npm run dev --workspace=web",

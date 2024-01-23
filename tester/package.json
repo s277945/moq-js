@@ -1,0 +1,24 @@
+{
+	"name": "tester",
+	"version": "0.0.1",
+	"type": "module",
+	"description": "tester utility",
+	"main": "dist/tester.js",
+	"scripts": {
+		"start": "node dist/tester.js",
+		"dev": "npx tsc && node dist/tester.js",
+		"build": "npx tsc",
+		"lint": "eslint .",
+		"fmt": "prettier --write ."
+	},
+	"author": "Alessandro Bottisio",
+	"license": "GPL-3.0-or-later",
+	"dependencies": {
+		"puppet-strings-chrome": "^2.0.4",
+		"puppeteer": "^21.7.0"
+	},
+	"devDependencies": {
+		"@types/node": "^20.11.5",
+		"@types/puppeteer": "^7.0.4"
+	}
+}

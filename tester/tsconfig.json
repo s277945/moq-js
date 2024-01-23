@@ -1,0 +1,19 @@
+{
+	"compilerOptions": {
+		"target": "es2022",
+		"module": "es2022",
+		"moduleResolution": "node",
+		"esModuleInterop": true,
+		"allowSyntheticDefaultImports": true,
+		"outDir": "./dist",
+		"declaration": true,
+		"strict": true,
+		"composite": true,
+		"declarationMap": true,
+		"sourceMap": true,
+		"isolatedModules": true,
+		"types": ["node"], // Don't automatically import any @types modules.
+		"lib": ["es2022", "DOM"],
+		"typeRoots": ["./types", "../node_modules/@types"]
+	}
+}

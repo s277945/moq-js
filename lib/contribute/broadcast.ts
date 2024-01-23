@@ -200,19 +200,19 @@ export class Broadcast {
 			if (done) break
 
 			// Serve the segment and log any errors that occur.
-			this.#serveSegment(subscriber, segment).catch((e) => {
+			this.#serveSegment(subscriber, segment, track.name == "audio" ? 0 : 1).catch((e) => {
 				const err = asError(e)
 				console.warn("failed to serve segment", err)
 			})
 		}
 	}
 
-	async #serveSegment(subscriber: SubscribeRecv, segment: Segment) {
+	async #serveSegment(subscriber: SubscribeRecv, segment: Segment, priority?: number) {
 		// Create a new stream for each segment.
 		const stream = await subscriber.data({
 			group: segment.id,
 			object: 0,
-			priority: 0, // TODO
+			priority: priority ?? 0, // TODO
 			expires: 30, // TODO configurable
 		})
 
