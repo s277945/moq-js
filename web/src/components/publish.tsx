@@ -12,7 +12,7 @@ const AUDIO_CODECS = [
 ]
 
 const AUDIO_BITRATE = 128000
-const VIDEO_BITRATE = 512000
+const VIDEO_BITRATE = 1000000
 interface VideoCodec {
 	name: string
 	profile: string
@@ -301,6 +301,7 @@ export default function Publish() {
 							"hover:bg-green-600": isStatus("ready") || isStatus("live"),
 						}}
 						class="text-white"
+						id={isStatus("ready") ? "startButton" : "noStartButton"}
 					>
 						<Switch>
 							<Match when={isStatus("device-none")}>Select Device</Match>
@@ -312,7 +313,7 @@ export default function Publish() {
 					</button>
 
 					<Show when={broadcast()}>
-						<a href={watchUrl} onClick={copyShare} class="form-button">
+						<a href={watchUrl} onClick={copyShare} class="form-button" id="shareButton">
 							Share
 						</a>
 					</Show>
@@ -445,6 +446,7 @@ function Device(props: {
 					e.preventDefault()
 				}}
 				class="rounded-r-none border-r-2 border-r-slate-900"
+				id="cameraButton"
 			>
 				Camera
 			</button>
@@ -459,6 +461,7 @@ function Device(props: {
 					e.preventDefault()
 				}}
 				class="rounded-l-none"
+				id="buttonWindow"
 			>
 				Window
 			</button>

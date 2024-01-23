@@ -19,3 +19,7 @@ tsconfig.tsbuildinfo
 
 # No longer used but just in case
 cert/
+tester/CantinaBand3.wav
+tester/sample.mjpeg
+tester/screenshot.png
+tester/test.wav
