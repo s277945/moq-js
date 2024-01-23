@@ -14,7 +14,7 @@
 	"author": "Alessandro Bottisio",
 	"license": "GPL-3.0-or-later",
 	"dependencies": {
-		"puppet-strings-chrome": "^2.0.4",
+		"chrome-finder": "^1.0.7",
 		"puppeteer": "^21.7.0"
 	},
 	"devDependencies": {

@@ -1,10 +1,13 @@
 import puppeteer from "puppeteer";
+import findChrome from "chrome-finder";
 
 const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
+const chromePath = findChrome();
 
 (async () => {
+	console.log(chromePath);
 	const browser = await puppeteer.launch({
-		executablePath: "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+		executablePath: chromePath,
 		headless: "new",
 		defaultViewport: null,
 		devtools: true,
@@ -13,8 +16,8 @@ const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 			"--window-position=0,0",
 			"--use-fake-ui-for-media-stream",
 			"--use-fake-device-for-media-stream",
-			"--use-file-for-fake-video-capture=H:/Tesi/moq-js/moq-js/tester/sample.mjpeg",
-			"--use-file-for-fake-audio-capture=H:/Tesi/moq-js/moq-js/tester/test.wav",
+			// "--use-file-for-fake-video-capture=H:/Tesi/moq-js/moq-js/tester/sample.mjpeg",
+			// "--use-file-for-fake-audio-capture=H:/Tesi/moq-js/moq-js/tester/test.wav",
 			"--autoplay-policy=no-user-gesture-required",
 		],
 	});
@@ -40,7 +43,7 @@ const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 	} catch (e) {
 		console.log("Could not start input device: timeout");
 	}
-	const selectCameraButton = await page.$("#buttonWindow");
+	const selectCameraButton = await page.$("#cameraButton");
 	await selectCameraButton?.click();
 	try {
 		await page.waitForSelector("#startButton", { timeout: 1000 });
