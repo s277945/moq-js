@@ -2,13 +2,22 @@ import { Connection, SubscribeRecv } from "../transport"
 import { asError } from "../common/error"
 import { Segment } from "./segment"
 import { Track } from "./track"
+import { Objects } from "../transport/object"
 import { Catalog, Mp4Track, VideoTrack, Track as CatalogTrack, AudioTrack } from "../media/catalog"
 
 import { isAudioTrackSettings, isVideoTrackSettings } from "../common/settings"
 
+export enum broadcastModeEnum {
+	STREAM = "reliable",
+	DATAGRAM = "unreliable",
+}
+
 export interface BroadcastConfig {
 	connection: Connection
 	media: MediaStream
+
+	dataMode?: broadcastModeEnum
+	connection2?: Connection
 
 	audio?: AudioEncoderConfig
 	video?: VideoEncoderConfig
@@ -26,12 +35,18 @@ export class Broadcast {
 	readonly catalog: Catalog
 	readonly connection: Connection
 
+	readonly connection2?: Connection
+	readonly dataMode: broadcastModeEnum
+	readonly dataModeEnum = broadcastModeEnum
 	#running: Promise<void>
 
 	constructor(config: BroadcastConfig) {
 		this.connection = config.connection
 		this.config = config
 		this.catalog = new Catalog()
+
+		this.dataMode = config.dataMode ?? this.dataModeEnum.STREAM
+		this.connection2 = this.dataMode ? config.connection2 : undefined
 
 		for (const media of this.config.media.getTracks()) {
 			const track = new Track(media, config)
@@ -208,7 +223,7 @@ export class Broadcast {
 	}
 
 	async #serveSegment(subscriber: SubscribeRecv, segment: Segment, priority?: number) {
-		// Create a new stream for each segment.
+		// Create a new reliable stream for each segment for header and datagram dispatch confirmation if required.
 		const stream = await subscriber.data({
 			group: segment.id,
 			object: 0,
@@ -216,8 +231,19 @@ export class Broadcast {
 			expires: 30, // TODO configurable
 		})
 
-		// Pipe the segment to the stream.
-		await segment.chunks().pipeTo(stream)
+		if (this.dataMode == this.dataModeEnum.STREAM) {
+			// reliable streams used for data
+			console.log(await segment.chunks().getReader().read())
+			await segment.chunks().pipeTo(stream)
+		} else {
+			// unreliable datagrams used for data
+			const writable = this.connection.getQuic().datagrams.writable
+			// Pipe the segment to the stream of datagrams.
+			await segment.chunks().pipeTo(writable)
+			const uint8 = new Uint8Array(1)
+			uint8[0] = 1 // write 1 to confirm end of datagram dispatch
+			await stream.getWriter().write(uint8)
+		}
 	}
 
 	// Attach the captured video stream to the given video element.

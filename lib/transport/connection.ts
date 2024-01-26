@@ -58,6 +58,9 @@ export class Connection {
 	subscribed() {
 		return this.#publisher.subscribed()
 	}
+	getQuic() {
+		return this.#quic
+	}
 
 	async #runControl() {
 		// Receive messages until the connection is closed.

@@ -12,12 +12,17 @@ import { Client } from "../transport/client"
 export type Range = Message.Range
 export type Timeline = Message.Timeline
 
+export enum broadcastModeEnum {
+	STREAM = "reliable",
+	DATAGRAM = "unreliable",
+}
 export interface PlayerConfig {
 	url: string
 	fingerprint?: string // URL to fetch TLS certificate fingerprint
 	element: HTMLCanvasElement | HTMLVideoElement
 	logger?: string
 	noVideoRender?: boolean
+	dataMode?: broadcastModeEnum
 }
 
 // This class must be created on the main thread due to AudioContext.
@@ -30,6 +35,8 @@ export class Player {
 	#connection: Connection
 	#catalog: Catalog
 	#noVideoRender: boolean | undefined
+	#dataMode?: broadcastModeEnum
+	#connection2?: Connection
 
 	// Running is a promise that resolves when the player is closed.
 	// #close is called with no error, while #abort is called with an error.
@@ -37,11 +44,20 @@ export class Player {
 	#close!: () => void
 	#abort!: (err: Error) => void
 
-	private constructor(connection: Connection, catalog: Catalog, backend: Webcodecs | MSE, noVideoRender?: boolean) {
+	private constructor(
+		connection: Connection,
+		catalog: Catalog,
+		backend: Webcodecs | MSE,
+		noVideoRender?: boolean,
+		dataMode?: broadcastModeEnum,
+		connection2?: Connection,
+	) {
 		this.#connection = connection
 		this.#catalog = catalog
 		this.#backend = backend
 		this.#noVideoRender = noVideoRender
+		this.#dataMode = dataMode
+		this.#connection2 = connection2
 
 		const abort = new Promise<void>((resolve, reject) => {
 			this.#close = resolve
@@ -56,6 +72,13 @@ export class Player {
 		const client = new Client({ url: config.url, fingerprint: config.fingerprint, role: "subscriber" })
 		const connection = await client.connect()
 
+		let client2 = undefined
+		let connection2 = undefined
+		if (config.dataMode && config.dataMode == broadcastModeEnum.DATAGRAM) {
+			client2 = new Client({ url: config.url, fingerprint: config.fingerprint, role: "subscriber" })
+			connection2 = await client2.connect()
+		}
+
 		const catalog = await Catalog.fetch(connection)
 
 		let backend
@@ -67,7 +90,7 @@ export class Player {
 			backend = new MSE({ element: config.element })
 		}
 
-		return new Player(connection, catalog, backend, config.noVideoRender ?? undefined)
+		return new Player(connection, catalog, backend, config.noVideoRender ?? undefined, config.dataMode, connection2)
 	}
 
 	async #run() {
@@ -113,22 +136,66 @@ export class Player {
 		}
 
 		const sub = await this.#connection.subscribe("", track.data_track)
-		try {
-			for (;;) {
-				const segment = await Promise.race([sub.data(), this.#running])
-				if (!segment) break
-
-				if (track.kind == "audio" || (!this.#noVideoRender && track.kind == "video")) {
-					this.#backend.segment({
-						init: track.init_track,
-						kind: track.kind,
-						header: segment.header,
-						stream: segment.stream,
-					})
+		// eslint-disable-next-line no-constant-condition
+		if (this.#dataMode == broadcastModeEnum.DATAGRAM) {
+			// datagram data transmission mode
+			const reader = this.#connection.getQuic().datagrams.readable.getReader()
+			const stream = new TransformStream()
+			const writer = stream.writable.getWriter()
+			try {
+				for (;;) {
+					const segment = await Promise.race([sub.data(), this.#running])
+					console.log("a")
+					console.log("b")
+					const streamReader = segment?.stream.getReader()
+					for (;;) {
+						const { value, done } = await reader.read()
+						console.log(value)
+						const r = await reader.read()
+						console.log(r)
+						// await writer.write(value)
+						if (done) break
+						// if (streamReader != undefined) {
+						// 	const { value, done } = await streamReader.read() // await datagram dispatch confirmation message on stream
+						// 	console.log(value)
+						// 	if (done) {
+						// 		await stream.writable.close()
+						// 		break
+						// 	}
+						// } else streamReader = segment?.stream.getReader()
+					}
+					if (!segment) break
+					if (track.kind == "audio" || (!this.#noVideoRender && track.kind == "video")) {
+						this.#backend.segment({
+							init: track.init_track,
+							kind: track.kind,
+							header: segment.header,
+							stream: stream.readable,
+						})
+					}
 				}
+			} finally {
+				await sub.close()
 			}
-		} finally {
-			await sub.close()
+		} else {
+			// reliable stream data transmission mode
+			try {
+				for (;;) {
+					const segment = await Promise.race([sub.data(), this.#running])
+					if (!segment) break
+
+					if (track.kind == "audio" || (!this.#noVideoRender && track.kind == "video")) {
+						this.#backend.segment({
+							init: track.init_track,
+							kind: track.kind,
+							header: segment.header,
+							stream: segment.stream,
+						})
+					}
+				}
+			} finally {
+				await sub.close()
+			}
 		}
 	}
 
@@ -166,6 +233,20 @@ export class Player {
 
 	async play() {
 		await this.#backend.play()
+	}
+
+	private async delay(milliseconds = 0, returnValue: any) {
+		return new Promise((done) => setTimeout(() => done(returnValue), milliseconds))
+	}
+
+	private async isFinished(promise: Promise<any>) {
+		return await Promise.race([
+			this.delay(0, false),
+			promise.then(
+				() => true,
+				() => true,
+			),
+		])
 	}
 
 	/*
