@@ -35,7 +35,6 @@ export class Broadcast {
 	readonly catalog: Catalog
 	readonly connection: Connection
 
-	readonly connection2?: Connection
 	readonly dataMode: broadcastModeEnum
 	readonly dataModeEnum = broadcastModeEnum
 	#running: Promise<void>
@@ -46,7 +45,6 @@ export class Broadcast {
 		this.catalog = new Catalog()
 
 		this.dataMode = config.dataMode ?? this.dataModeEnum.STREAM
-		this.connection2 = this.dataMode ? config.connection2 : undefined
 
 		for (const media of this.config.media.getTracks()) {
 			const track = new Track(media, config)

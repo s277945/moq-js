@@ -36,7 +36,7 @@ export class Player {
 	#catalog: Catalog
 	#noVideoRender: boolean | undefined
 	#dataMode?: broadcastModeEnum
-	#connection2?: Connection
+	#chunksMap: Map<number, Map<number, Uint8Array[]>>
 
 	// Running is a promise that resolves when the player is closed.
 	// #close is called with no error, while #abort is called with an error.
@@ -50,14 +50,13 @@ export class Player {
 		backend: Webcodecs | MSE,
 		noVideoRender?: boolean,
 		dataMode?: broadcastModeEnum,
-		connection2?: Connection,
 	) {
 		this.#connection = connection
 		this.#catalog = catalog
 		this.#backend = backend
 		this.#noVideoRender = noVideoRender
-		this.#dataMode = dataMode
-		this.#connection2 = connection2
+		this.#dataMode = dataMode ?? broadcastModeEnum.DATAGRAM
+		this.#chunksMap = new Map<number, Map<number, Uint8Array[]>>()
 
 		const abort = new Promise<void>((resolve, reject) => {
 			this.#close = resolve
@@ -72,13 +71,6 @@ export class Player {
 		const client = new Client({ url: config.url, fingerprint: config.fingerprint, role: "subscriber" })
 		const connection = await client.connect()
 
-		let client2 = undefined
-		let connection2 = undefined
-		if (config.dataMode && config.dataMode == broadcastModeEnum.DATAGRAM) {
-			client2 = new Client({ url: config.url, fingerprint: config.fingerprint, role: "subscriber" })
-			connection2 = await client2.connect()
-		}
-
 		const catalog = await Catalog.fetch(connection)
 
 		let backend
@@ -90,12 +82,14 @@ export class Player {
 			backend = new MSE({ element: config.element })
 		}
 
-		return new Player(connection, catalog, backend, config.noVideoRender ?? undefined, config.dataMode, connection2)
+		return new Player(connection, catalog, backend, config.noVideoRender ?? undefined, config.dataMode)
 	}
 
 	async #run() {
 		const inits = new Set<string>()
 		const tracks = new Array<Mp4Track>()
+		let audio = false
+		let video = false
 
 		for (const track of this.#catalog.tracks) {
 			if (!isMp4Track(track)) {
@@ -106,6 +100,8 @@ export class Player {
 				// TODO temporary hack to disable audio in MSE
 				continue
 			}
+			if (isAudioTrack(track)) audio = true
+			if (isVideoTrack(track)) video = true
 			inits.add(track.init_track)
 			tracks.push(track)
 		}
@@ -115,7 +111,9 @@ export class Player {
 		await Promise.all(Array.from(inits).map((init) => this.#runInit(init)))
 
 		// Call #runTrack on each track
-		await Promise.all(tracks.map((track) => this.#runTrack(track)))
+		if (this.#dataMode == broadcastModeEnum.DATAGRAM)
+			await Promise.all([tracks.map((track) => this.#runTrack(track)), this.#runDatagrams(audio, video)])
+		else await Promise.all(tracks.map((track) => this.#runTrack(track)))
 	}
 
 	async #runInit(name: string) {
@@ -130,6 +128,43 @@ export class Player {
 		}
 	}
 
+	async #runDatagrams(audio: boolean, video: boolean) {
+		const readable = this.#connection.getQuic().datagrams.readable // incoming datagram stream
+		const reader = readable.getReader() // stream reader
+		for (;;) {
+			const { value, done } = await reader.read() // read from stream
+			if (value) {
+				const res = value as Uint8Array
+				const utf = new TextDecoder().decode(res)
+				const splitData = utf.split(" ") // split object fields
+				const trackId = Number(splitData.shift()) // decode track id
+				const sequence = Number(splitData.shift()) // decode object sequence number
+				const data = res.subarray(16, res.length - 1) // extract data
+				// console.log(trackId, sequence, data)
+
+				const track = this.#chunksMap.get(trackId) // get track chunks map
+				if (track) {
+					const dataArray = track.get(sequence) // get object chunks array
+					if (dataArray) {
+						dataArray.push(data) // add data to array
+					} else {
+						const dataArray: Uint8Array[] = [] // create object chunks array
+						dataArray.push(data) // add data to array
+						track.set(sequence, dataArray) // add data to object data map
+					}
+				} else {
+					const dataMap = new Map<number, Uint8Array[]>() // create object data map
+					const dataArray: Uint8Array[] = [] // create object chunks array
+					dataArray.push(data) // add data to array
+					dataMap.set(sequence, dataArray) // add array to object data map
+					this.#chunksMap.set(trackId, dataMap) // add object data map to tracks map
+				}
+			}
+
+			if (done) break
+		}
+	}
+
 	async #runTrack(track: Mp4Track) {
 		if (track.kind !== "audio" && track.kind !== "video") {
 			throw new Error(`unknown track kind: ${track.kind}`)
@@ -139,40 +174,35 @@ export class Player {
 		// eslint-disable-next-line no-constant-condition
 		if (this.#dataMode == broadcastModeEnum.DATAGRAM) {
 			// datagram data transmission mode
-			const reader = this.#connection.getQuic().datagrams.readable.getReader()
-			const stream = new TransformStream()
-			const writer = stream.writable.getWriter()
 			try {
 				for (;;) {
 					const segment = await Promise.race([sub.data(), this.#running])
-					console.log("a")
-					console.log("b")
-					const streamReader = segment?.stream.getReader()
-					for (;;) {
-						const { value, done } = await reader.read()
-						console.log(value)
-						const r = await reader.read()
-						console.log(r)
-						// await writer.write(value)
-						if (done) break
-						// if (streamReader != undefined) {
-						// 	const { value, done } = await streamReader.read() // await datagram dispatch confirmation message on stream
-						// 	console.log(value)
-						// 	if (done) {
-						// 		await stream.writable.close()
-						// 		break
-						// 	}
-						// } else streamReader = segment?.stream.getReader()
-					}
 					if (!segment) break
-					if (track.kind == "audio" || (!this.#noVideoRender && track.kind == "video")) {
-						this.#backend.segment({
-							init: track.init_track,
-							kind: track.kind,
-							header: segment.header,
-							stream: stream.readable,
+					const data = this.#chunksMap.get(Number(segment.header.track))?.get(Number(segment.header.group))
+					if (data) {
+						// console.log("test", data[0])
+						const stream = new ReadableStream({
+							start(controller) {
+								controller.enqueue(data[0])
+								// console.log("added to stream", data[0])
+								if (data.length > 1) {
+									controller.enqueue(data[1])
+									// console.log("added to stream", data[1])
+								}
+								controller.close()
+							},
 						})
-					}
+						// console.log("test", await stream.getReader().read())
+						console.log("segment received", segment.header, stream)
+						if (track.kind == "audio" || (!this.#noVideoRender && track.kind == "video")) {
+							this.#backend.segment({
+								init: track.init_track,
+								kind: track.kind,
+								header: segment.header,
+								stream: stream,
+							})
+						}
+					} else console.log("Object datagrams not received")
 				}
 			} finally {
 				await sub.close()
