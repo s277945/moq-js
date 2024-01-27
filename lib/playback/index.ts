@@ -88,8 +88,6 @@ export class Player {
 	async #run() {
 		const inits = new Set<string>()
 		const tracks = new Array<Mp4Track>()
-		let audio = false
-		let video = false
 
 		for (const track of this.#catalog.tracks) {
 			if (!isMp4Track(track)) {
@@ -100,8 +98,6 @@ export class Player {
 				// TODO temporary hack to disable audio in MSE
 				continue
 			}
-			if (isAudioTrack(track)) audio = true
-			if (isVideoTrack(track)) video = true
 			inits.add(track.init_track)
 			tracks.push(track)
 		}
@@ -112,7 +108,7 @@ export class Player {
 
 		// Call #runTrack on each track
 		if (this.#dataMode == broadcastModeEnum.DATAGRAM)
-			await Promise.all([tracks.map((track) => this.#runTrack(track)), this.#runDatagrams(audio, video)])
+			await Promise.all([tracks.map((track) => this.#runTrack(track)), this.#runDatagrams()])
 		else await Promise.all(tracks.map((track) => this.#runTrack(track)))
 	}
 
@@ -128,8 +124,8 @@ export class Player {
 		}
 	}
 
-	async #runDatagrams(audio: boolean, video: boolean) {
-		const readable = this.#connection.getQuic().datagrams.readable // incoming datagram stream
+	async #runDatagrams() {
+		const readable = this.#connection.getQuic().datagrams.readable // incoming datagrams as readable stream
 		const reader = readable.getReader() // stream reader
 		for (;;) {
 			const { value, done } = await reader.read() // read from stream
@@ -171,7 +167,7 @@ export class Player {
 		}
 
 		const sub = await this.#connection.subscribe("", track.data_track)
-		// eslint-disable-next-line no-constant-condition
+
 		if (this.#dataMode == broadcastModeEnum.DATAGRAM) {
 			// datagram data transmission mode
 			try {
@@ -193,7 +189,7 @@ export class Player {
 							},
 						})
 						// console.log("test", await stream.getReader().read())
-						console.log("segment received", segment.header, stream)
+						console.log("segment received", segment.header, data)
 						if (track.kind == "audio" || (!this.#noVideoRender && track.kind == "video")) {
 							this.#backend.segment({
 								init: track.init_track,
