@@ -3,6 +3,7 @@ import * as Message from "./webcodecs/message"
 import { Connection } from "../transport/connection"
 import { Catalog, isAudioTrack, isMp4Track, isVideoTrack, Mp4Track } from "../media/catalog"
 import { asError } from "../common/error"
+import { postLogDataAndForget } from "../common/index"
 
 // We support two different playback implementations:
 import Webcodecs from "./webcodecs"
@@ -55,7 +56,7 @@ export class Player {
 		this.#catalog = catalog
 		this.#backend = backend
 		this.#noVideoRender = noVideoRender
-		this.#dataMode = dataMode ?? broadcastModeEnum.DATAGRAM
+		this.#dataMode = dataMode ?? broadcastModeEnum.STREAM
 		this.#chunksMap = new Map<number, Map<number, Uint8Array[]>>()
 
 		const abort = new Promise<void>((resolve, reject) => {
@@ -179,11 +180,8 @@ export class Player {
 						// console.log("test", data[0])
 						const stream = new ReadableStream({
 							start(controller) {
-								controller.enqueue(data[0])
-								// console.log("added to stream", data[0])
-								if (data.length > 1) {
-									controller.enqueue(data[1])
-									// console.log("added to stream", data[1])
+								for (const chunk of data) {
+									controller.enqueue(chunk)
 								}
 								controller.close()
 							},

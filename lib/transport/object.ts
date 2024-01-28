@@ -34,7 +34,31 @@ export class Objects {
 			sender_ts: header.timestamp,
 			jitter: 0,
 		})
-		return stream
+
+		let object_chunk_count = header.object
+		const tstream = new TransformStream({
+			// trasform stream to pipe through data chunks and log their dispatch
+			async transform(chunk, controller) {
+				chunk = await chunk // await chunk ready for dispatch
+
+				object_chunk_count += 1 // increase chunk counter
+				// console.log(chunk, object_chunk_count)
+				const ts = Date.now()
+				postLogDataAndForget({
+					object: object_chunk_count,
+					group: header.group,
+					track: BigInt(header.track).toString(), // converted to string because bigint is not natively supported in JSON
+					status: "sent",
+					sender_ts: ts,
+					jitter: 0,
+				})
+
+				controller.enqueue(chunk) // send packet for dispatch to exit stream
+			},
+		})
+
+		tstream.readable.pipeThrough({ writable: stream, readable: tstream.readable })
+		return tstream.writable
 	}
 
 	async recv(): Promise<{ stream: ReadableStream<Uint8Array>; header: Header } | undefined> {
@@ -69,7 +93,30 @@ export class Objects {
 				// jitter: 0,
 			})
 		}
-		return { header, stream }
+		let object_chunk_count = header.object
+		const tstream = new TransformStream({
+			// trasform stream to pipe through data chunks and log their arrival
+			async transform(chunk, controller) {
+				chunk = await chunk // await chunk arrival
+
+				object_chunk_count += 1 // increase chunk counter
+				// console.log(chunk, object_chunk_count)
+				const ts = Date.now()
+				postLogDataAndForget({
+					object: object_chunk_count,
+					group: header.group,
+					track: BigInt(header.track).toString(), // converted to string because bigint is not natively supported in JSON
+					receiver_ts: ts,
+					status: "received",
+					// jitter: 0,
+				})
+
+				controller.enqueue(chunk)
+			},
+		})
+		stream.pipeThrough(tstream)
+
+		return { header, stream: tstream.readable }
 	}
 
 	async #decode(s: ReadableStream<Uint8Array>) {

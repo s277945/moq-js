@@ -2,11 +2,14 @@ import express from "express";
 import cors from "cors";
 import { fileLog, fileLogLine, logAdditionalData, AdditionalLogConfig } from "./api/logger";
 import { setFileStatus, getFileStatus } from "./api/file_status";
+import { Latency } from "./api/latency";
 
 const ADDITIONAL_DATA_CONFIG: AdditionalLogConfig = {
 	cpu: true,
 	net: false,
 };
+
+const latencyCalc = new Latency(); // compute latency from timestamps
 
 const app = express();
 //enable cors for localhost app
@@ -105,7 +108,16 @@ app.post("/log-data", (req, res) => {
 		if (data.status != undefined) {
 			str += ";" + data.status;
 			if (data.status === "sent") {
-				if (data.sender_ts != undefined) str += ";" + data.sender_ts;
+				if (data.sender_ts != undefined) {
+					latencyCalc.addSenderTS(
+						filename,
+						data.track.toString(),
+						data.group.toString(),
+						data.object.toString(),
+						data.sender_ts.toString(),
+					); // store data to compute latency if necessary
+					str += ";" + data.sender_ts;
+				}
 				if (data.jitter != undefined) {
 					str += ";" + data.jitter;
 					console.log(
@@ -152,9 +164,20 @@ app.post("/log-data", (req, res) => {
 								data.track +
 								(data.latency ? " : " + data.latency + " ms" : ""),
 						);
-				} else if (data.sender_ts != undefined && data.receiver_ts != undefined) {
+				} else {
+					let latency;
 					// compute and print latency data from timestamps if received
-					const latency = data.receiver_ts > data.sender_ts ? data.receiver_ts - data.sender_ts : undefined;
+					if (data.sender_ts != undefined && data.receiver_ts != undefined)
+						latency = data.receiver_ts > data.sender_ts ? data.receiver_ts - data.sender_ts : undefined;
+					else
+						latency = latencyCalc.getLatency(
+							filename,
+							data.track.toString(),
+							data.group.toString(),
+							data.object.toString(),
+							data.receiver_ts.toString(),
+						);
+
 					if (data.jitter != undefined) {
 						str += ";" + data.jitter;
 						console.log(
@@ -164,7 +187,7 @@ app.post("/log-data", (req, res) => {
 								data.group +
 								" of track " +
 								data.track +
-								(latency ? " : " + latency + " ms" : "could not be computed"),
+								(latency ? " : " + latency + " ms" : " could not be computed"),
 							", receiver jitter: " + data.jitter,
 							"ms",
 						);
@@ -176,7 +199,7 @@ app.post("/log-data", (req, res) => {
 								data.group +
 								" of track " +
 								data.track +
-								(latency ? " : " + latency + " ms" : "could not be computed"),
+								(latency ? " : " + latency + " ms" : " could not be computed"),
 						);
 				}
 			}
