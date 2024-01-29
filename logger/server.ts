@@ -95,7 +95,7 @@ app.post("/log-init", (req, res) => {
 });
 
 //POST response for localhost:/latency-data
-app.post("/log-data", (req, res) => {
+app.post("/log-data", async (req, res) => {
 	const data = req.body.data;
 	const filename = req.body.fileName;
 	if (data && data.object != undefined && data.group != undefined && data.track != undefined) {
@@ -170,7 +170,7 @@ app.post("/log-data", (req, res) => {
 					if (data.sender_ts != undefined && data.receiver_ts != undefined)
 						latency = data.receiver_ts > data.sender_ts ? data.receiver_ts - data.sender_ts : undefined;
 					else
-						latency = latencyCalc.getLatency(
+						latency = await latencyCalc.getLatency(
 							filename,
 							data.track.toString(),
 							data.group.toString(),
