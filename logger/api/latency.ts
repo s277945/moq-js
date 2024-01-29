@@ -1,5 +1,7 @@
 import { Mutex, MutexInterface } from "async-mutex";
 
+const later = (delay: number) => new Promise((resolve) => setTimeout(resolve, delay));
+
 interface SharedTimestamp {
 	value?: string;
 	mutex?: Mutex;
@@ -64,7 +66,7 @@ export class Latency {
 			let entry: SharedTimestamp = { mutex: new Mutex() };
 			await entry.mutex?.acquire();
 			chunks.set(chunkNum, entry);
-			await entry.mutex?.waitForUnlock();
+			await Promise.race([later(100), entry.mutex?.waitForUnlock()]);
 			return entry?.value;
 		}
 	}

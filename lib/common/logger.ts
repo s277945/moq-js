@@ -15,7 +15,8 @@ interface jitterData {
 }
 
 let fileName = "log.txt"
-let lastTimestampMap = new Map<string, jitterData>()
+let lastHeaderTimestampMap = new Map<string, jitterData>()
+let lastChunkTimestampMap = new Map<string, jitterData>()
 
 // format for latency data
 export interface LogData {
@@ -84,9 +85,29 @@ export function logTrackTypes(audio?: number, video?: number): void {
 			body: JSON.stringify({ audio: audio, video: video, fileName: fileName }),
 			headers: { "Content-Type": "application/json" },
 		})
-		if (audio) lastTimestampMap.set(`${audio}`, { lastDelta: undefined, lastTimestamp: undefined })
-		if (video) lastTimestampMap.set(`${video}`, { lastDelta: undefined, lastTimestamp: undefined })
-		console.log(lastTimestampMap.has(`${audio}`), lastTimestampMap.has(`${video}`))
+		if (audio) {
+			lastHeaderTimestampMap.set(`${audio}`, {
+				lastDelta: undefined,
+				lastTimestamp: undefined,
+			})
+
+			lastChunkTimestampMap.set(`${audio}`, {
+				lastDelta: undefined,
+				lastTimestamp: undefined,
+			})
+		}
+		if (video) {
+			lastHeaderTimestampMap.set(`${video}`, {
+				lastDelta: undefined,
+				lastTimestamp: undefined,
+			})
+
+			lastChunkTimestampMap.set(`${video}`, {
+				lastDelta: undefined,
+				lastTimestamp: undefined,
+			})
+		}
+		// console.log(lastTimestampMap.has(`${audio}`), lastTimestampMap.has(`${video}`))
 	}
 }
 // function to get cached logger server status
@@ -97,22 +118,37 @@ export function getCachedLoggerStatus(): boolean {
 export function postLogDataAndForget(data: LogData): void {
 	// calculate packet jitter if data is available
 	if (data.jitter != undefined) {
-		let lastTimestamp = lastTimestampMap.get(data.track)?.lastTimestamp
-		let lastDelta = lastTimestampMap.get(data.track)?.lastDelta
-		console.log(lastTimestamp, lastDelta)
+		let lastTimestamp =
+			data.object != 0
+				? lastChunkTimestampMap.get(data.track)?.lastTimestamp
+				: lastHeaderTimestampMap.get(data.track)?.lastTimestamp
+		let lastDelta =
+			data.object != 0
+				? lastChunkTimestampMap.get(data.track)?.lastDelta
+				: lastHeaderTimestampMap.get(data.track)?.lastDelta
+		// console.log(lastTimestamp, lastDelta)
 		if (lastTimestamp != undefined && data.sender_ts != undefined) {
 			if (lastDelta === undefined) data.jitter = 0
 			else data.jitter = Math.abs(data.sender_ts - lastTimestamp - lastDelta)
+			console.log(lastDelta)
+			console.log(data.jitter)
 			// console.log(data.sender_ts - lastTimestamp)
 			// if (lastDelta) console.log(data.sender_ts - lastTimestamp - lastDelta)
 			lastDelta = data.sender_ts - lastTimestamp
-			lastTimestampMap.set(data.track, { lastTimestamp: lastTimestamp, lastDelta: lastDelta })
+			if (data.object! != 0)
+				lastChunkTimestampMap.set(data.track, { lastTimestamp: lastTimestamp, lastDelta: lastDelta })
+			else lastHeaderTimestampMap.set(data.track, { lastTimestamp: lastTimestamp, lastDelta: lastDelta })
 		}
 	}
 	// save last timestamp if available
 	if (data.sender_ts) {
-		let lastDelta = lastTimestampMap.get(data.track)?.lastDelta
-		lastTimestampMap.set(data.track, { lastTimestamp: data.sender_ts, lastDelta: lastDelta })
+		let lastDelta =
+			data.object != 0
+				? lastChunkTimestampMap.get(data.track)?.lastDelta
+				: lastHeaderTimestampMap.get(data.track)?.lastDelta
+		if (data.object! != 0)
+			lastChunkTimestampMap.set(data.track, { lastTimestamp: data.sender_ts, lastDelta: lastDelta })
+		else lastHeaderTimestampMap.set(data.track, { lastTimestamp: data.sender_ts, lastDelta: lastDelta })
 	}
 
 	//send log data

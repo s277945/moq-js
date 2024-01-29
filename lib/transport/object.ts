@@ -16,9 +16,11 @@ export interface Header {
 
 export class Objects {
 	private quic: WebTransport
+	private chunkStartPatternMap: Map<string, string>
 
 	constructor(quic: WebTransport) {
 		this.quic = quic
+		this.chunkStartPatternMap = new Map<string, string>()
 	}
 
 	async send(header: Header): Promise<WritableStream<Uint8Array>> {
@@ -35,23 +37,32 @@ export class Objects {
 			jitter: 0,
 		})
 
+		const patternMap = this.chunkStartPatternMap
+		let trackPattern = patternMap.get(header.track.toString()) // get track data chunk start pattern
 		let object_chunk_count = header.object
+
 		const tstream = new TransformStream({
 			// trasform stream to pipe through data chunks and log their dispatch
 			async transform(chunk, controller) {
 				chunk = await chunk // await chunk ready for dispatch
-
-				object_chunk_count += 1 // increase chunk counter
-				// console.log(chunk, object_chunk_count)
-				const ts = Date.now()
-				postLogDataAndForget({
-					object: object_chunk_count,
-					group: header.group,
-					track: BigInt(header.track).toString(), // converted to string because bigint is not natively supported in JSON
-					status: "sent",
-					sender_ts: ts,
-					jitter: 0,
-				})
+				const test = chunk as Uint8Array
+				if (!trackPattern) {
+					// starting pattern not yet saved
+					trackPattern = test.subarray(0, 17).toString() // extract pattern
+					patternMap.set(header.track.toString(), trackPattern) // save this starting pattern
+				}
+				console.log(chunk, object_chunk_count)
+				if (test.subarray(0, 17).toString() == trackPattern) {
+					object_chunk_count += 1 // increase chunk counter
+					postLogDataAndForget({
+						object: object_chunk_count,
+						group: header.group,
+						track: BigInt(header.track).toString(), // converted to string because bigint is not natively supported in JSON
+						status: "sent",
+						sender_ts: Date.now(),
+						jitter: 0,
+					})
+				}
 
 				controller.enqueue(chunk) // send packet for dispatch to exit stream
 			},
@@ -93,23 +104,34 @@ export class Objects {
 				// jitter: 0,
 			})
 		}
+
+		const patternMap = this.chunkStartPatternMap
+		let trackPattern = patternMap.get(header.track.toString()) // get track data chunk start pattern
 		let object_chunk_count = header.object
+
 		const tstream = new TransformStream({
 			// trasform stream to pipe through data chunks and log their arrival
 			async transform(chunk, controller) {
 				chunk = await chunk // await chunk arrival
-
-				object_chunk_count += 1 // increase chunk counter
-				// console.log(chunk, object_chunk_count)
-				const ts = Date.now()
-				postLogDataAndForget({
-					object: object_chunk_count,
-					group: header.group,
-					track: BigInt(header.track).toString(), // converted to string because bigint is not natively supported in JSON
-					receiver_ts: ts,
-					status: "received",
-					// jitter: 0,
-				})
+				const test = chunk as Uint8Array
+				if (!trackPattern) {
+					// starting pattern not yet saved
+					trackPattern = test.subarray(0, 17).toString() // extract pattern
+					patternMap.set(header.track.toString(), trackPattern) // save this starting pattern
+				}
+				console.log(chunk, object_chunk_count)
+				if (test.subarray(0, 17).toString() == trackPattern) {
+					object_chunk_count += 1 // increase chunk counter
+					// console.log(chunk, object_chunk_count)
+					postLogDataAndForget({
+						object: object_chunk_count,
+						group: header.group,
+						track: BigInt(header.track).toString(), // converted to string because bigint is not natively supported in JSON
+						receiver_ts: Date.now(),
+						status: "received",
+						// jitter: 0,
+					})
+				}
 
 				controller.enqueue(chunk)
 			},
