@@ -4,6 +4,7 @@ import { Connection } from "../transport/connection"
 import { Catalog, isAudioTrack, isMp4Track, isVideoTrack, Mp4Track } from "../media/catalog"
 import { asError } from "../common/error"
 import { postLogDataAndForget } from "../common/index"
+import { Mutex, MutexInterface } from "async-mutex"
 
 // We support two different playback implementations:
 import Webcodecs from "./webcodecs"
@@ -26,6 +27,19 @@ export interface PlayerConfig {
 	dataMode?: broadcastModeEnum
 }
 
+const later = (delay: number) => new Promise((resolve) => setTimeout(resolve, delay))
+
+interface Datagram {
+	sequence: number
+	data: Uint8Array
+}
+
+interface Group {
+	datagrams?: Datagram[]
+	mutex?: Mutex
+	done: boolean
+}
+
 // This class must be created on the main thread due to AudioContext.
 export class Player {
 	#backend: Webcodecs | MSE
@@ -37,7 +51,8 @@ export class Player {
 	#catalog: Catalog
 	#noVideoRender: boolean | undefined
 	#dataMode?: broadcastModeEnum
-	#chunksMap: Map<number, Map<number, Uint8Array[]>>
+	#chunksMap: Map<string, Map<number, Group>>
+	#mutex: Mutex
 
 	// Running is a promise that resolves when the player is closed.
 	// #close is called with no error, while #abort is called with an error.
@@ -56,8 +71,9 @@ export class Player {
 		this.#catalog = catalog
 		this.#backend = backend
 		this.#noVideoRender = noVideoRender
-		this.#dataMode = dataMode ?? broadcastModeEnum.STREAM
-		this.#chunksMap = new Map<number, Map<number, Uint8Array[]>>()
+		this.#dataMode = dataMode ?? broadcastModeEnum.DATAGRAM
+		this.#chunksMap = new Map<string, Map<number, Group>>()
+		this.#mutex = new Mutex()
 
 		const abort = new Promise<void>((resolve, reject) => {
 			this.#close = resolve
@@ -128,33 +144,48 @@ export class Player {
 	async #runDatagrams() {
 		const readable = this.#connection.getQuic().datagrams.readable // incoming datagrams as readable stream
 		const reader = readable.getReader() // stream reader
+		console.log("a")
 		for (;;) {
 			const { value, done } = await reader.read() // read from stream
 			if (value) {
+				console.log(value)
 				const res = value as Uint8Array
 				const utf = new TextDecoder().decode(res)
 				const splitData = utf.split(" ") // split object fields
-				const trackId = Number(splitData.shift()) // decode track id
-				const sequence = Number(splitData.shift()) // decode object sequence number
-				const data = res.subarray(16, res.length - 1) // extract data
-				// console.log(trackId, sequence, data)
-
-				const track = this.#chunksMap.get(trackId) // get track chunks map
-				if (track) {
-					const dataArray = track.get(sequence) // get object chunks array
-					if (dataArray) {
-						dataArray.push(data) // add data to array
-					} else {
-						const dataArray: Uint8Array[] = [] // create object chunks array
-						dataArray.push(data) // add data to array
-						track.set(sequence, dataArray) // add data to object data map
+				console.log(splitData.length)
+				if (splitData.length > 3) {
+					const trackId = Number(splitData.shift()).toString() // decode track id
+					const groupId = Number(splitData.shift()) // decode object sequence number
+					const sequence = Number(splitData.shift()) // decode object sequence number
+					const data = res.subarray(16, res.length - 1) // extract data
+					// console.log(trackId, sequence, data)
+					await this.#mutex.acquire() // start atomic operation on chunksMap
+					let track = this.#chunksMap.get(trackId) // get track chunks map
+					if (!track) {
+						track = new Map<number, Group>()
+						this.#chunksMap.set(trackId, track)
 					}
+					let group = track.get(groupId)
+					if (!group) {
+						group = { datagrams: [], mutex: new Mutex(), done: false }
+						track.set(groupId, group)
+					}
+					group.datagrams?.push({ sequence: sequence, data: data })
+					console.log(data)
+					this.#mutex.release() // end atomic operation on chunksMap
 				} else {
-					const dataMap = new Map<number, Uint8Array[]>() // create object data map
-					const dataArray: Uint8Array[] = [] // create object chunks array
-					dataArray.push(data) // add data to array
-					dataMap.set(sequence, dataArray) // add array to object data map
-					this.#chunksMap.set(trackId, dataMap) // add object data map to tracks map
+					const trackId = Number(splitData.shift()).toString() // decode track id
+					const groupId = Number(splitData.shift()) // decode object sequence number
+					const msg = String(splitData.shift()) // decode object sequence number
+					await this.#mutex.acquire() // start atomic operation on chunksMap
+					const group = this.#chunksMap.get(trackId)?.get(groupId)
+					if (group && msg == "end") {
+						console.log(msg)
+						// group end message
+						group.done = true // set group state to done
+						this.#mutex.release() // end atomic operation on chunksMap
+						group.mutex?.release() // release group mutex
+					} else this.#mutex.release() // end atomic operation on chunksMap
 				}
 			}
 
@@ -175,19 +206,36 @@ export class Player {
 				for (;;) {
 					const segment = await Promise.race([sub.data(), this.#running])
 					if (!segment) break
-					const data = this.#chunksMap.get(Number(segment.header.track))?.get(Number(segment.header.group))
-					if (data) {
+					await this.#mutex.acquire() // start atomic operation on chunksMap
+					let trackMap = this.#chunksMap.get(segment.header.track.toString()) // get track groups map
+					if (!trackMap) {
+						trackMap = new Map<number, Group>()
+						this.#chunksMap.set(segment.header.track.toString(), trackMap)
+					}
+					let group = trackMap.get(segment.header.group) // get group datagrams map
+					if (!group) {
+						group = { datagrams: [], mutex: new Mutex(), done: false }
+						trackMap.set(segment.header.group, group)
+					}
+					this.#mutex.release() // end atomic operation on chunksMap
+					await group.mutex?.acquire()
+					if (!group.done) await Promise.race([later(10000), group.mutex?.waitForUnlock(), this.#running]) // wait for datagrams reception
+					console.log(segment)
+					console.log(group)
+					if (group.done) {
 						// console.log("test", data[0])
 						const stream = new ReadableStream({
 							start(controller) {
-								for (const chunk of data) {
-									controller.enqueue(chunk)
-								}
+								if (group.datagrams?.sort((a, b) => a.sequence - b.sequence))
+									// sort datagrams by chunk sequence and add to stream
+									for (const datagram of group.datagrams) {
+										controller.enqueue(datagram.data)
+									}
 								controller.close()
 							},
 						})
 						// console.log("test", await stream.getReader().read())
-						console.log("segment received", segment.header, data)
+						// console.log("segment received", segment.header, group)
 						if (track.kind == "audio" || (!this.#noVideoRender && track.kind == "video")) {
 							this.#backend.segment({
 								init: track.init_track,

@@ -51,7 +51,7 @@ export class Objects {
 					trackPattern = test.subarray(0, 17).toString() // extract pattern
 					patternMap.set(header.track.toString(), trackPattern) // save this starting pattern
 				}
-				console.log(chunk, object_chunk_count)
+				// console.log(chunk, object_chunk_count)
 				if (test.subarray(0, 17).toString() == trackPattern) {
 					object_chunk_count += 1 // increase chunk counter
 					postLogDataAndForget({
@@ -119,10 +119,11 @@ export class Objects {
 					trackPattern = test.subarray(0, 17).toString() // extract pattern
 					patternMap.set(header.track.toString(), trackPattern) // save this starting pattern
 				}
-				console.log(chunk, object_chunk_count)
+				// console.log(chunk, object_chunk_count)
 				if (test.subarray(0, 17).toString() == trackPattern) {
 					object_chunk_count += 1 // increase chunk counter
 					// console.log(chunk, object_chunk_count)
+
 					postLogDataAndForget({
 						object: object_chunk_count,
 						group: header.group,
