@@ -30,12 +30,12 @@ export interface PlayerConfig {
 const later = (delay: number) => new Promise((resolve) => setTimeout(resolve, delay))
 
 interface Datagram {
-	sequence: number
+	number: number
 	data: Uint8Array
 }
 
 interface Group {
-	datagrams?: Datagram[]
+	chunks?: Map<number, Datagram[]>
 	mutex?: Mutex
 	done: boolean
 }
@@ -144,11 +144,11 @@ export class Player {
 	async #runDatagrams() {
 		const readable = this.#connection.getQuic().datagrams.readable // incoming datagrams as readable stream
 		const reader = readable.getReader() // stream reader
-		console.log("a")
+		console.log("Datagram reception active")
 		for (;;) {
 			const { value, done } = await reader.read() // read from stream
 			if (value) {
-				console.log(value)
+				// console.log(value)
 				const res = value as Uint8Array
 				const utf = new TextDecoder().decode(res)
 				const splitData = utf.split(" ") // split object fields
@@ -156,8 +156,9 @@ export class Player {
 				if (splitData.length > 3) {
 					const trackId = Number(splitData.shift()).toString() // decode track id
 					const groupId = Number(splitData.shift()) // decode object sequence number
-					const sequence = Number(splitData.shift()) // decode object sequence number
-					const data = res.subarray(16, res.length - 1) // extract data
+					const sequenceNum = Number(splitData.shift()) // decode object sequence number
+					const sliceNum = Number(splitData.shift()) // decode object sequence number
+					const data = res.subarray(32, res.length) // extract data
 					// console.log(trackId, sequence, data)
 					await this.#mutex.acquire() // start atomic operation on chunksMap
 					let track = this.#chunksMap.get(trackId) // get track chunks map
@@ -167,11 +168,16 @@ export class Player {
 					}
 					let group = track.get(groupId)
 					if (!group) {
-						group = { datagrams: [], mutex: new Mutex(), done: false }
+						group = { chunks: new Map<number, Datagram[]>(), mutex: new Mutex(), done: false }
 						track.set(groupId, group)
 					}
-					group.datagrams?.push({ sequence: sequence, data: data })
-					console.log(data)
+					let datagrams = group.chunks?.get(sequenceNum)
+					if (!datagrams) {
+						datagrams = []
+						group.chunks?.set(sequenceNum, datagrams)
+					}
+					datagrams.push({ number: sliceNum, data: data })
+					// console.log(data)
 					this.#mutex.release() // end atomic operation on chunksMap
 				} else {
 					const trackId = Number(splitData.shift()).toString() // decode track id
@@ -214,23 +220,47 @@ export class Player {
 					}
 					let group = trackMap.get(segment.header.group) // get group datagrams map
 					if (!group) {
-						group = { datagrams: [], mutex: new Mutex(), done: false }
+						group = { chunks: new Map<number, Datagram[]>(), mutex: new Mutex(), done: false }
 						trackMap.set(segment.header.group, group)
 					}
 					this.#mutex.release() // end atomic operation on chunksMap
 					await group.mutex?.acquire()
 					if (!group.done) await Promise.race([later(10000), group.mutex?.waitForUnlock(), this.#running]) // wait for datagrams reception
 					console.log(segment)
-					console.log(group)
+					// console.log(group)
 					if (group.done) {
 						// console.log("test", data[0])
 						const stream = new ReadableStream({
 							start(controller) {
-								if (group.datagrams?.sort((a, b) => a.sequence - b.sequence))
-									// sort datagrams by chunk sequence and add to stream
-									for (const datagram of group.datagrams) {
-										controller.enqueue(datagram.data)
+								const chunks = group.chunks // get group chunks map
+								if (chunks) {
+									// sort chunk map keys in ascending order
+									for (const key of [...chunks.keys()].sort((a, b) => a - b)) {
+										const chunk = chunks.get(key) // extract a chunk for each sequence (key)
+										if (chunk) {
+											if (chunk.length > 1) {
+												const unfused_data = chunk
+													.sort((a, b) => a.number - b.number)
+													.map((a) => a.data)
+												let length = 0
+												unfused_data.forEach((item) => {
+													length += item.length
+												})
+												const data = new Uint8Array(length)
+												let offset = 0
+												unfused_data.forEach((item) => {
+													data.set(item, offset)
+													offset += item.length
+												})
+												console.log(data)
+												controller.enqueue(data)
+											} else {
+												console.log(chunk[0].data)
+												controller.enqueue(chunk[0].data)
+											}
+										}
 									}
+								}
 								controller.close()
 							},
 						})
