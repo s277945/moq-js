@@ -24,10 +24,10 @@ interface Datagram {
 
 interface Group {
 	currentChunk: number
-	readable?: ReadableStream<Uint8Array>
-	writable?: WritableStream<Uint8Array>
 	chunks?: Map<number, Datagram[]>
 	mutex?: Mutex
+	signal?: Mutex
+	delete?: () => void
 	done: boolean
 }
 
@@ -140,27 +140,38 @@ export class Objects {
 					currentChunk: 1,
 					chunks: new Map<number, Datagram[]>(),
 					mutex: new Mutex(),
+					signal: new Mutex(),
+					delete: () => {
+						trackMap.delete(header.group)
+						if (group?.chunks) group.chunks = undefined
+					},
 					done: false,
 				}
 				trackMap.set(header.group, group)
 			}
+
 			this.mutex.release() // end atomic operation on chunksMap
 
-			const wait = async () => {
-				await this.mutex.acquire()
-			}
-			const release = () => {
-				this.mutex.release()
-			}
+			// const wait = async () => {
+			// 	await this.mutex.acquire()
+			// }
+			// const release = () => {
+			// 	this.mutex.release()
+			// }
 			stream = new ReadableStream({
 				async pull(controller) {
-					await wait() // start atomic operation on chunksMap
-					let done = group.done
-					release() // end atomic operation on chunksMap
+					// await wait() // start atomic operation on chunksMap
 					await group.mutex?.acquire()
-					if (!done && group.mutex?.isLocked()) await Promise.race([later(3000), group.mutex?.waitForUnlock()])
+					await group.signal?.acquire()
+					let done = group.done
+					// release() // end atomic operation on chunksMap
+					if (!done && group.signal?.isLocked()) {
+						group.mutex?.release() // release group mutex
+						await Promise.race([later(3000), group.signal?.waitForUnlock()])
+						await group.mutex?.acquire()
+					}
 					// wait for datagrams reception
-					await wait() // start atomic operation on chunksMap
+					// await wait() // start atomic operation on chunksMap
 					if (group.chunks) {
 						let chunk = group.chunks.get(group.currentChunk) // try to get a new chunk
 						while (chunk) {
@@ -169,9 +180,15 @@ export class Objects {
 							chunk = group.chunks.get(group.currentChunk) // try to get a new chunk
 						}
 						done = group.done
-						release() // end atomic operation on chunksMap
-						if (done) controller.close()
-					} else release() // end atomic operation on chunksMap
+						// release() // end atomic operation on chunksMap
+						if (done) {
+							group.mutex?.release()
+							if (group.delete) group.delete()
+							controller.close()
+						}
+					}
+					group.mutex?.release() // release group mutex
+					// else release() // end atomic operation on chunksMap
 				},
 			})
 		}
@@ -287,30 +304,38 @@ export class Objects {
 								currentChunk: 1,
 								chunks: new Map<number, Datagram[]>(),
 								mutex: new Mutex(),
+								signal: new Mutex(),
+								delete: () => {
+									track.delete(groupId)
+									if (group?.chunks) group.chunks = undefined
+								},
 								done: false,
 							}
 							track.set(groupId, group)
 						}
+						this.mutex.release() // end atomic operation on chunksMap
 
+						await group.mutex?.acquire() // acquire group mutex
 						let datagrams = group.chunks?.get(sequenceNum)
 						if (!datagrams) {
 							datagrams = []
 							group.chunks?.set(sequenceNum, datagrams)
 						}
 						datagrams.push({ number: sliceNum, data: data })
+						group.mutex?.release() // release group mutex
 
 						// console.log(data)
-						this.mutex.release() // end atomic operation on chunksMap
 					} else if (splitData.length == 4) {
 						const trackId = Number(splitData.shift()).toString() // decode track id
 						const groupId = Number(splitData.shift()) // decode group id number
 						const sequenceNum = Number(splitData.shift()) // decode object sequence number
 						const msg = String(splitData.shift()) // decode message
 
-						await this.mutex.acquire() // start atomic operation on chunksMap
+						// await this.mutex.acquire() // start atomic operation on chunksMap
 						const group = this.chunksMap.get(trackId)?.get(groupId)
 
 						if (group && msg == "end_chunk") {
+							// group.signal?.release() // release group mutex
 							if (group.currentChunk <= sequenceNum) {
 								console.log(msg)
 								// chunk end message
@@ -338,7 +363,9 @@ export class Objects {
 												offset += item.length
 											})
 
+											await group.mutex?.acquire() // acquire group mutex
 											chunks.set(sequenceNum, [{ number: 0, data: data }])
+											group.mutex?.release() // release group mutex
 										}
 										console.log(chunk[0].data) // chunk ready
 									}
@@ -353,23 +380,27 @@ export class Objects {
 									sequenceNum,
 								)
 							}
-							this.mutex.release() // end atomic operation on chunksMap
-							group.mutex?.release() // release group mutex
-						} else this.mutex.release() // end atomic operation on chunksMap
+							// this.mutex.release() // end atomic operation on chunksMap
+							group.signal?.release() // release group mutex
+						}
+						// else this.mutex.release() // end atomic operation on chunksMap
 					} else if (splitData.length == 3) {
 						const trackId = Number(splitData.shift()).toString() // decode track id
 						const groupId = Number(splitData.shift()) // decode group id number
 						const msg = String(splitData.shift()) // decode message
 
-						await this.mutex.acquire() // start atomic operation on chunksMap
+						// await this.mutex.acquire() // start atomic operation on chunksMap
 						const group = this.chunksMap.get(trackId)?.get(groupId) // get group
 
 						// received end message ?
 						if (group && msg == "end") {
+							await group.mutex?.acquire() // release group mutex
 							group.done = true // set group state to done
-							this.mutex.release() // end atomic operation on chunksMap
+							// this.mutex.release() // end atomic operation on chunksMap
 							group.mutex?.release() // release group mutex
-						} else this.mutex.release()
+							group.signal?.release() // release group mutex
+						}
+						// else this.mutex.release()
 					}
 				}
 
