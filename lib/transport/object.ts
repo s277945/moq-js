@@ -2,10 +2,9 @@ import { Reader, Writer } from "./stream"
 import { postLogDataAndForget } from "../common/index"
 export { Reader, Writer }
 import { Mutex } from "async-mutex"
+import { Channel } from "queueable"
 
 // This is OBJECT but we can't use that name because it's a reserved word.
-
-const later = (delay: number) => new Promise((resolve) => setTimeout(resolve, delay))
 
 export interface Header {
 	track: bigint
@@ -24,9 +23,8 @@ interface Datagram {
 
 interface Group {
 	currentChunk: number
-	chunks?: Map<number, Datagram[]>
-	mutex?: Mutex
-	signal?: Mutex
+	chunks: Map<number, Datagram[]>
+	readyChunks: Channel<Uint8Array>
 	delete?: () => void
 	done: boolean
 }
@@ -139,11 +137,9 @@ export class Objects {
 				group = {
 					currentChunk: 1,
 					chunks: new Map<number, Datagram[]>(),
-					mutex: new Mutex(),
-					signal: new Mutex(),
+					readyChunks: new Channel<Uint8Array>(),
 					delete: () => {
 						trackMap.delete(header.group)
-						if (group?.chunks) group.chunks = undefined
 					},
 					done: false,
 				}
@@ -152,53 +148,24 @@ export class Objects {
 
 			this.mutex.release() // end atomic operation on chunksMap
 
-			// const wait = async () => {
-			// 	await this.mutex.acquire()
-			// }
-			// const release = () => {
-			// 	this.mutex.release()
-			// }
 			stream = new ReadableStream({
 				async pull(controller) {
-					// await wait() // start atomic operation on chunksMap
-					await group.mutex?.acquire()
-					await group.signal?.acquire()
-					let done = group.done
-					// release() // end atomic operation on chunksMap
-					if (!done && group.signal?.isLocked()) {
-						group.mutex?.release() // release group mutex
-						await Promise.race([later(3000), group.signal?.waitForUnlock()])
-						await group.mutex?.acquire()
+					for await (const chunk of group.readyChunks) {
+						// wait for datagrams reception
+						controller.enqueue(chunk)
+						console.log(chunk)
 					}
-					// wait for datagrams reception
-					// await wait() // start atomic operation on chunksMap
-					if (group.chunks) {
-						let chunk = group.chunks.get(group.currentChunk) // try to get a new chunk
-						while (chunk) {
-							group.currentChunk += 1 // increase chunk reading position
-							controller.enqueue(chunk[0].data) // send chunk to stream
-							chunk = group.chunks.get(group.currentChunk) // try to get a new chunk
-						}
-						done = group.done
-						// release() // end atomic operation on chunksMap
-						if (done) {
-							group.mutex?.release()
-							if (group.delete) group.delete()
-							controller.close()
-						}
-					}
-					group.mutex?.release() // release group mutex
-					// else release() // end atomic operation on chunksMap
+					controller.close()
+					if (group.delete) group.delete() // delete group from datagrams map once all chunks have been processed
 				},
 			})
 		}
 
-		const patternMap = this.chunkStartPatternMap
-		let trackPattern = patternMap.get(header.track.toString()) // get track data chunk start pattern
-		let object_chunk_count = header.object
-
 		let tstream
 		if (!this.datagramMode) {
+			const patternMap = this.chunkStartPatternMap
+			let trackPattern = patternMap.get(header.track.toString()) // get track data chunk start pattern
+			let object_chunk_count = header.object
 			tstream = new TransformStream({
 				// trasform stream to pipe through data chunks and log their arrival
 				async transform(chunk, controller) {
@@ -281,17 +248,14 @@ export class Objects {
 					const utf = new TextDecoder().decode(res)
 					const splitData = utf.split(" ") // split object fields
 
-					console.log(splitData.length)
 					if (splitData.length > 4) {
 						const trackId = Number(splitData.shift()).toString() // decode track id
 						const groupId = Number(splitData.shift()) // decode group id number
 						const sequenceNum = Number(splitData.shift()) // decode object sequence number
 						const sliceNum = Number(splitData.shift()) // decode slice number
 						const data = res.subarray(32, res.length) // extract data
-						// console.log(trackId, sequence, data)
 
 						await this.mutex.acquire() // start atomic operation on chunksMap
-
 						let track = this.chunksMap.get(trackId) // get track chunks map
 						if (!track) {
 							track = new Map<number, Group>()
@@ -303,11 +267,9 @@ export class Objects {
 							group = {
 								currentChunk: 1,
 								chunks: new Map<number, Datagram[]>(),
-								mutex: new Mutex(),
-								signal: new Mutex(),
+								readyChunks: new Channel<Uint8Array>(),
 								delete: () => {
 									track.delete(groupId)
-									if (group?.chunks) group.chunks = undefined
 								},
 								done: false,
 							}
@@ -315,36 +277,26 @@ export class Objects {
 						}
 						this.mutex.release() // end atomic operation on chunksMap
 
-						await group.mutex?.acquire() // acquire group mutex
 						let datagrams = group.chunks?.get(sequenceNum)
 						if (!datagrams) {
 							datagrams = []
 							group.chunks?.set(sequenceNum, datagrams)
 						}
 						datagrams.push({ number: sliceNum, data: data })
-						group.mutex?.release() // release group mutex
-
-						// console.log(data)
 					} else if (splitData.length == 4) {
 						const trackId = Number(splitData.shift()).toString() // decode track id
 						const groupId = Number(splitData.shift()) // decode group id number
 						const sequenceNum = Number(splitData.shift()) // decode object sequence number
 						const msg = String(splitData.shift()) // decode message
 
-						// await this.mutex.acquire() // start atomic operation on chunksMap
 						const group = this.chunksMap.get(trackId)?.get(groupId)
 
 						if (group && msg == "end_chunk") {
-							// group.signal?.release() // release group mutex
 							if (group.currentChunk <= sequenceNum) {
-								console.log(msg)
-								// chunk end message
-
 								const chunks = group.chunks // get group chunks map
 								if (chunks) {
 									const chunk = chunks.get(sequenceNum) // extract chunk for corresponding sequence
 									if (chunk) {
-										// console.log(chunk)
 										if (chunk.length > 1) {
 											// if chunk was sliced, merge slices
 											const unfused_data = chunk
@@ -363,11 +315,11 @@ export class Objects {
 												offset += item.length
 											})
 
-											await group.mutex?.acquire() // acquire group mutex
-											chunks.set(sequenceNum, [{ number: 0, data: data }])
-											group.mutex?.release() // release group mutex
+											void group.readyChunks.push(data) // add to chunks ready to be consumed
+										} else {
+											void group.readyChunks.push(chunk[0].data) // only one slice to add to chunks ready to be consumed
 										}
-										console.log(chunk[0].data) // chunk ready
+										chunks.delete(sequenceNum) // delete entry from incoming chunks
 									}
 								}
 							} else {
@@ -380,30 +332,21 @@ export class Objects {
 									sequenceNum,
 								)
 							}
-							// this.mutex.release() // end atomic operation on chunksMap
-							group.signal?.release() // release group mutex
 						}
-						// else this.mutex.release() // end atomic operation on chunksMap
 					} else if (splitData.length == 3) {
 						const trackId = Number(splitData.shift()).toString() // decode track id
 						const groupId = Number(splitData.shift()) // decode group id number
 						const msg = String(splitData.shift()) // decode message
 
-						// await this.mutex.acquire() // start atomic operation on chunksMap
 						const group = this.chunksMap.get(trackId)?.get(groupId) // get group
 
 						// received end message ?
 						if (group && msg == "end") {
-							await group.mutex?.acquire() // release group mutex
 							group.done = true // set group state to done
-							// this.mutex.release() // end atomic operation on chunksMap
-							group.mutex?.release() // release group mutex
-							group.signal?.release() // release group mutex
+							void group.readyChunks.push(new Uint8Array(), true) // close ready chunks queue
 						}
-						// else this.mutex.release()
 					}
 				}
-
 				if (done) break
 			}
 		}
