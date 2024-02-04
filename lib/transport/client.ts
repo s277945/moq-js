@@ -54,7 +54,7 @@ export class Client {
 		const _server = await setup.recv.server()
 
 		const control = new Control.Stream(reader, writer)
-		const objects = new Objects(quic)
+		const objects = new Objects(quic, true)
 
 		return new Connection(quic, control, objects)
 	}

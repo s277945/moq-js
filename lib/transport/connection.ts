@@ -40,7 +40,7 @@ export class Connection {
 	}
 
 	async #run(): Promise<void> {
-		await Promise.all([this.#runControl(), this.#runObjects()])
+		await Promise.all([this.#runControl(), this.#runObjects(), this.#objects.receiveDatagrams()])
 	}
 
 	announce(namespace: string) {

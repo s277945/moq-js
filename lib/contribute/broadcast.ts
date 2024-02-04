@@ -2,7 +2,6 @@ import { Connection, SubscribeRecv } from "../transport"
 import { asError } from "../common/error"
 import { Segment } from "./segment"
 import { Track } from "./track"
-import { Objects } from "../transport/object"
 import { Catalog, Mp4Track, VideoTrack, Track as CatalogTrack, AudioTrack } from "../media/catalog"
 
 import { isAudioTrackSettings, isVideoTrackSettings } from "../common/settings"
