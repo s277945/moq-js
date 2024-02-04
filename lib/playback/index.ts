@@ -3,6 +3,7 @@ import * as Message from "./webcodecs/message"
 import { Connection } from "../transport/connection"
 import { Catalog, isAudioTrack, isMp4Track, isVideoTrack, Mp4Track } from "../media/catalog"
 import { asError } from "../common/error"
+import { Reader, Writer } from "../transport/stream"
 import { postLogDataAndForget } from "../common/index"
 import { Mutex, MutexInterface } from "async-mutex"
 
@@ -35,6 +36,9 @@ interface Datagram {
 }
 
 interface Group {
+	currentChunk: number
+	readable?: ReadableStream<Uint8Array>
+	writable?: WritableStream<Uint8Array>
 	chunks?: Map<number, Datagram[]>
 	mutex?: Mutex
 	done: boolean
@@ -145,53 +149,112 @@ export class Player {
 		const readable = this.#connection.getQuic().datagrams.readable // incoming datagrams as readable stream
 		const reader = readable.getReader() // stream reader
 		console.log("Datagram reception active")
+
 		for (;;) {
 			const { value, done } = await reader.read() // read from stream
 			if (value) {
-				// console.log(value)
 				const res = value as Uint8Array
 				const utf = new TextDecoder().decode(res)
 				const splitData = utf.split(" ") // split object fields
+
 				console.log(splitData.length)
-				if (splitData.length > 3) {
+				if (splitData.length > 4) {
 					const trackId = Number(splitData.shift()).toString() // decode track id
-					const groupId = Number(splitData.shift()) // decode object sequence number
+					const groupId = Number(splitData.shift()) // decode group id number
 					const sequenceNum = Number(splitData.shift()) // decode object sequence number
-					const sliceNum = Number(splitData.shift()) // decode object sequence number
+					const sliceNum = Number(splitData.shift()) // decode slice number
 					const data = res.subarray(32, res.length) // extract data
 					// console.log(trackId, sequence, data)
+
 					await this.#mutex.acquire() // start atomic operation on chunksMap
+
 					let track = this.#chunksMap.get(trackId) // get track chunks map
 					if (!track) {
 						track = new Map<number, Group>()
 						this.#chunksMap.set(trackId, track)
 					}
+
 					let group = track.get(groupId)
 					if (!group) {
-						group = { chunks: new Map<number, Datagram[]>(), mutex: new Mutex(), done: false }
+						group = {
+							currentChunk: 1,
+							chunks: new Map<number, Datagram[]>(),
+							mutex: new Mutex(),
+							done: false,
+						}
 						track.set(groupId, group)
 					}
+
 					let datagrams = group.chunks?.get(sequenceNum)
 					if (!datagrams) {
 						datagrams = []
 						group.chunks?.set(sequenceNum, datagrams)
 					}
 					datagrams.push({ number: sliceNum, data: data })
+
 					// console.log(data)
 					this.#mutex.release() // end atomic operation on chunksMap
-				} else {
+				} else if (splitData.length == 4) {
 					const trackId = Number(splitData.shift()).toString() // decode track id
-					const groupId = Number(splitData.shift()) // decode object sequence number
-					const msg = String(splitData.shift()) // decode object sequence number
+					const groupId = Number(splitData.shift()) // decode group id number
+					const sequenceNum = Number(splitData.shift()) // decode object sequence number
+					const msg = String(splitData.shift()) // decode message
+
 					await this.#mutex.acquire() // start atomic operation on chunksMap
 					const group = this.#chunksMap.get(trackId)?.get(groupId)
-					if (group && msg == "end") {
-						console.log(msg)
-						// group end message
-						group.done = true // set group state to done
+
+					if (group && msg == "end_chunk") {
+						if (group.currentChunk <= sequenceNum) {
+							console.log(msg)
+							// chunk end message
+
+							const chunks = group.chunks // get group chunks map
+							if (chunks) {
+								const chunk = chunks.get(sequenceNum) // extract chunk for corresponding sequence
+								if (chunk) {
+									// console.log(chunk)
+									if (chunk.length > 1) {
+										// if chunk was sliced, merge slices
+										const unfused_data = chunk
+											.sort((a, b) => a.number - b.number)
+											.map((a) => a.data)
+
+										let length = 0
+										unfused_data.forEach((item) => {
+											length += item.length
+										})
+
+										const data = new Uint8Array(length)
+										let offset = 0
+										unfused_data.forEach((item) => {
+											data.set(item, offset)
+											offset += item.length
+										})
+
+										chunks.set(sequenceNum, [{ number: 0, data: data }])
+									}
+									console.log(chunk[0].data) // chunk ready
+								}
+							}
+						} else
+							console.log("Discarded late chunk: track", trackId, "group", groupId, "object", sequenceNum)
 						this.#mutex.release() // end atomic operation on chunksMap
 						group.mutex?.release() // release group mutex
 					} else this.#mutex.release() // end atomic operation on chunksMap
+				} else if (splitData.length == 3) {
+					const trackId = Number(splitData.shift()).toString() // decode track id
+					const groupId = Number(splitData.shift()) // decode group id number
+					const msg = String(splitData.shift()) // decode message
+
+					await this.#mutex.acquire() // start atomic operation on chunksMap
+					const group = this.#chunksMap.get(trackId)?.get(groupId) // get group
+
+					// received end message ?
+					if (group && msg == "end") {
+						group.done = true // set group state to done
+						this.#mutex.release() // end atomic operation on chunksMap
+						group.mutex?.release() // release group mutex
+					} else this.#mutex.release()
 				}
 			}
 
@@ -220,61 +283,53 @@ export class Player {
 					}
 					let group = trackMap.get(segment.header.group) // get group datagrams map
 					if (!group) {
-						group = { chunks: new Map<number, Datagram[]>(), mutex: new Mutex(), done: false }
+						group = {
+							currentChunk: 1,
+							chunks: new Map<number, Datagram[]>(),
+							mutex: new Mutex(),
+							done: false,
+						}
 						trackMap.set(segment.header.group, group)
 					}
 					this.#mutex.release() // end atomic operation on chunksMap
-					await group.mutex?.acquire()
-					if (!group.done) await Promise.race([later(10000), group.mutex?.waitForUnlock(), this.#running]) // wait for datagrams reception
 					console.log(segment)
 					// console.log(group)
-					if (group.done) {
-						// console.log("test", data[0])
-						const stream = new ReadableStream({
-							start(controller) {
-								const chunks = group.chunks // get group chunks map
-								if (chunks) {
-									// sort chunk map keys in ascending order
-									for (const key of [...chunks.keys()].sort((a, b) => a - b)) {
-										const chunk = chunks.get(key) // extract a chunk for each sequence (key)
-										if (chunk) {
-											if (chunk.length > 1) {
-												const unfused_data = chunk
-													.sort((a, b) => a.number - b.number)
-													.map((a) => a.data)
-												let length = 0
-												unfused_data.forEach((item) => {
-													length += item.length
-												})
-												const data = new Uint8Array(length)
-												let offset = 0
-												unfused_data.forEach((item) => {
-													data.set(item, offset)
-													offset += item.length
-												})
-												console.log(data)
-												controller.enqueue(data)
-											} else {
-												console.log(chunk[0].data)
-												controller.enqueue(chunk[0].data)
-											}
+					const wait = async () => {
+						await this.#mutex.acquire()
+					}
+					const release = () => {
+						this.#mutex.release()
+					}
+					if (track.kind == "audio" || (!this.#noVideoRender && track.kind == "video")) {
+						this.#backend.segment({
+							init: track.init_track,
+							kind: track.kind,
+							header: segment.header,
+							stream: new ReadableStream({
+								async pull(controller) {
+									await wait() // start atomic operation on chunksMap
+									let done = group.done
+									await group.mutex?.acquire()
+									release() // end atomic operation on chunksMap
+									if (!done) await Promise.race([later(3000), group.mutex?.waitForUnlock()])
+									// wait for datagrams reception
+									else group.mutex?.release()
+									await wait() // start atomic operation on chunksMap
+									if (group.chunks) {
+										let chunk = group.chunks.get(group.currentChunk) // try to get a new chunk
+										while (chunk) {
+											group.currentChunk += 1 // increase chunk reading position
+											controller.enqueue(chunk[0].data) // send chunk to stream
+											chunk = group.chunks.get(group.currentChunk) // try to get a new chunk
 										}
-									}
-								}
-								controller.close()
-							},
+										done = group.done
+										release() // end atomic operation on chunksMap
+										if (done) controller.close()
+									} else release() // end atomic operation on chunksMap
+								},
+							}),
 						})
-						// console.log("test", await stream.getReader().read())
-						// console.log("segment received", segment.header, group)
-						if (track.kind == "audio" || (!this.#noVideoRender && track.kind == "video")) {
-							this.#backend.segment({
-								init: track.init_track,
-								kind: track.kind,
-								header: segment.header,
-								stream: stream,
-							})
-						}
-					} else console.log("Object datagrams not received")
+					}
 				}
 			} finally {
 				await sub.close()
