@@ -153,7 +153,7 @@ export class Objects {
 					for await (const chunk of group.readyChunks) {
 						// wait for datagrams reception
 						controller.enqueue(chunk)
-						console.log(chunk)
+						// console.log(chunk)
 					}
 					controller.close()
 					if (group.delete) group.delete() // delete group from datagrams map once all chunks have been processed
@@ -161,41 +161,39 @@ export class Objects {
 			})
 		}
 
-		let tstream
-		if (!this.datagramMode) {
-			const patternMap = this.chunkStartPatternMap
-			let trackPattern = patternMap.get(header.track.toString()) // get track data chunk start pattern
-			let object_chunk_count = header.object
-			tstream = new TransformStream({
-				// trasform stream to pipe through data chunks and log their arrival
-				async transform(chunk, controller) {
-					chunk = await chunk // await chunk arrival
-					const test = chunk as Uint8Array
-					if (!trackPattern) {
-						// starting pattern not yet saved
-						trackPattern = test.subarray(0, 17).toString() // extract pattern
-						patternMap.set(header.track.toString(), trackPattern) // save this starting pattern
-					}
+		const patternMap = this.chunkStartPatternMap
+		let trackPattern = patternMap.get(header.track.toString()) // get track data chunk start pattern
+		let object_chunk_count = header.object
+
+		const tstream = new TransformStream({
+			// trasform stream to pipe through data chunks and log their arrival
+			async transform(chunk, controller) {
+				chunk = await chunk // await chunk arrival
+				const test = chunk as Uint8Array
+				if (!trackPattern) {
+					// starting pattern not yet saved
+					trackPattern = test.subarray(0, 17).toString() // extract pattern
+					patternMap.set(header.track.toString(), trackPattern) // save this starting pattern
+				}
+				// console.log(chunk, object_chunk_count)
+				if (test.subarray(0, 17).toString() == trackPattern) {
+					object_chunk_count += 1 // increase chunk counter
 					// console.log(chunk, object_chunk_count)
-					if (test.subarray(0, 17).toString() == trackPattern) {
-						object_chunk_count += 1 // increase chunk counter
-						// console.log(chunk, object_chunk_count)
 
-						postLogDataAndForget({
-							object: object_chunk_count,
-							group: header.group,
-							track: BigInt(header.track).toString(), // converted to string because bigint is not natively supported in JSON
-							receiver_ts: Date.now(),
-							status: "received",
-							// jitter: 0,
-						})
-					}
+					postLogDataAndForget({
+						object: object_chunk_count,
+						group: header.group,
+						track: BigInt(header.track).toString(), // converted to string because bigint is not natively supported in JSON
+						receiver_ts: Date.now(),
+						status: "received",
+						// jitter: 0,
+					})
+				}
 
-					controller.enqueue(chunk)
-				},
-			})
-			stream.pipeThrough(tstream)
-		}
+				controller.enqueue(chunk)
+			},
+		})
+		stream.pipeThrough(tstream)
 
 		return { header, stream: tstream ? tstream.readable : stream }
 	}
@@ -248,12 +246,13 @@ export class Objects {
 					const utf = new TextDecoder().decode(res)
 					const splitData = utf.split(" ") // split object fields
 
-					if (splitData.length > 4) {
+					if (splitData.length > 5) {
 						const trackId = Number(splitData.shift()).toString() // decode track id
 						const groupId = Number(splitData.shift()) // decode group id number
 						const sequenceNum = Number(splitData.shift()) // decode object sequence number
 						const sliceNum = Number(splitData.shift()) // decode slice number
-						const data = res.subarray(32, res.length) // extract data
+						const sliceLen = Number(splitData.shift()) // decode slice number
+						const data = res.subarray(43, res.length) // extract data
 
 						await this.mutex.acquire() // start atomic operation on chunksMap
 						let track = this.chunksMap.get(trackId) // get track chunks map
@@ -283,10 +282,11 @@ export class Objects {
 							group.chunks?.set(sequenceNum, datagrams)
 						}
 						datagrams.push({ number: sliceNum, data: data })
-					} else if (splitData.length == 4) {
+					} else if (splitData.length == 5) {
 						const trackId = Number(splitData.shift()).toString() // decode track id
 						const groupId = Number(splitData.shift()) // decode group id number
 						const sequenceNum = Number(splitData.shift()) // decode object sequence number
+						const sliceLen = Number(splitData.shift()) // decode slice number
 						const msg = String(splitData.shift()) // decode message
 
 						const group = this.chunksMap.get(trackId)?.get(groupId)
@@ -314,10 +314,33 @@ export class Objects {
 												data.set(item, offset)
 												offset += item.length
 											})
-
-											void group.readyChunks.push(data) // add to chunks ready to be consumed
+											// console.log(data.length, sliceLen)
+											if (data.length == sliceLen) {
+												void group.readyChunks.push(data) // add to chunks ready to be consumed
+												group.currentChunk = sequenceNum
+											} else
+												console.log(
+													"corrupted or incomplete chunk",
+													sequenceNum,
+													"of group",
+													groupId,
+													"of track",
+													trackId,
+												)
 										} else {
-											void group.readyChunks.push(chunk[0].data) // only one slice to add to chunks ready to be consumed
+											// console.log(chunk[0].data.length, sliceLen)
+											if (chunk[0].data.length == sliceLen) {
+												void group.readyChunks.push(chunk[0].data) // add to chunks ready to be consumed
+												group.currentChunk = sequenceNum
+											} else
+												console.log(
+													"corrupted or incomplete chunk",
+													sequenceNum,
+													"of group",
+													groupId,
+													"of track",
+													trackId,
+												)
 										}
 										chunks.delete(sequenceNum) // delete entry from incoming chunks
 									}
