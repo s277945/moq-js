@@ -68,7 +68,7 @@ export class Objects {
 		let trackPattern = patternMap.get(header.track.toString()) // get track data chunk start pattern
 		let object_chunk_count = header.object
 		const datagramMode = this.datagramMode
-		const sendDatagram = (datagram: Uint8Array) => this.sendDatagram(datagram)
+		const sendDatagram = (datagram: Uint8Array) => this.sendDatagram(datagram) // function that calls sendDatagram inside TransformStream
 
 		const tstream = new TransformStream({
 			// trasform stream to pipe through data chunks and log their dispatch
@@ -122,6 +122,13 @@ export class Objects {
 				} else controller.enqueue(chunk) // send packet for dispatch to reliable quic stream
 			},
 		})
+
+		const end = new TextEncoder().encode(
+			`${header.track} ${header.group} end`, // end group message format: trackId GroupId 'end'
+		)
+
+		const w = new Writer(stream)
+		await w.write(end) // send end group message in quic stream
 
 		tstream.readable.pipeThrough({ writable: stream, readable: tstream.readable })
 		return tstream.writable
