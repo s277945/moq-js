@@ -44,6 +44,12 @@ export class Objects {
 		this.mutex = new Mutex()
 	}
 
+	async sendDatagram(datagram: Uint8Array) {
+		const w = this.quic.datagrams.writable.getWriter() // get quic instance datagrams writer
+		await w.write(datagram) // send datagram to quic
+		w.releaseLock() // release writer
+	}
+
 	async send(header: Header): Promise<WritableStream<Uint8Array>> {
 		const stream = await this.quic.createUnidirectionalStream() //creates a new quic stream
 		header.timestamp = Date.now()
@@ -61,6 +67,8 @@ export class Objects {
 		const patternMap = this.chunkStartPatternMap
 		let trackPattern = patternMap.get(header.track.toString()) // get track data chunk start pattern
 		let object_chunk_count = header.object
+		const datagramMode = this.datagramMode
+		const sendDatagram = (datagram: Uint8Array) => this.sendDatagram(datagram)
 
 		const tstream = new TransformStream({
 			// trasform stream to pipe through data chunks and log their dispatch
@@ -75,6 +83,7 @@ export class Objects {
 				// console.log(chunk, object_chunk_count)
 				if (test.subarray(0, 17).toString() == trackPattern) {
 					object_chunk_count += 1 // increase chunk counter
+
 					postLogDataAndForget({
 						object: object_chunk_count,
 						group: header.group,
@@ -85,7 +94,32 @@ export class Objects {
 					})
 				}
 
-				controller.enqueue(chunk) // send packet for dispatch to exit stream
+				if (datagramMode) {
+					// chunk is sent as quic datagram
+					const data = chunk as Uint8Array
+					const slicesNumber = Math.floor(data.length / 1024) // number of slices of 1024
+
+					for (let c = 0, offset = 0; offset < data.length; c++) {
+						const sliceLen = c < slicesNumber ? 1024 : data.length - offset // last iteration can have slice size smaller than 1024
+
+						const datagramHeader = new TextEncoder().encode(
+							`${header.track} ${header.group} ${object_chunk_count} ${c + 1} ${sliceLen} `, // header format: trackId GroupId ObjectId SliceNum SliceLength
+						) // create datagram header
+						const datagram = new Uint8Array(sliceLen + datagramHeader.length) // init datagram
+
+						datagram.set(datagramHeader, 0) // write datagram header
+						datagram.set(data.subarray(offset, offset + sliceLen), datagramHeader.length) // write datagram data (media chunk)
+
+						await sendDatagram(datagram)
+
+						offset += sliceLen
+					}
+
+					const end_chunk = new TextEncoder().encode(
+						`${header.track} ${header.group} ${object_chunk_count} ${data.length} end_chunk`, // end chunk message format: trackId GroupId ObjectId ChunkLength 'end_chunk'
+					)
+					await sendDatagram(end_chunk)
+				} else controller.enqueue(chunk) // send packet for dispatch to reliable quic stream
 			},
 		})
 
@@ -253,7 +287,7 @@ export class Objects {
 						const sliceNum = Number(splitData.shift()) // decode slice number
 						const sliceLen = Number(splitData.shift()) // decode slice number
 						const data = res.subarray(43, res.length) // extract data
-
+						// console.log(data)
 						await this.mutex.acquire() // start atomic operation on chunksMap
 						let track = this.chunksMap.get(trackId) // get track chunks map
 						if (!track) {
