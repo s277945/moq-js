@@ -123,15 +123,15 @@ export class Objects {
 					await sendDatagram(end_chunk)
 				} else controller.enqueue(chunk) // send packet for dispatch to reliable quic stream
 			},
+			async flush() {
+				if (datagramMode) {
+					const end = new TextEncoder().encode(
+						`${header.track} ${header.group} end`, // end group message format: trackId GroupId 'end'
+					)
+					await sendDatagram(end)
+				}
+			},
 		})
-
-		if (datagramMode) {
-			const end = new TextEncoder().encode(
-				`${header.track} ${header.group} end`, // end group message format: trackId GroupId 'end'
-			)
-
-			await sendDatagram(end)
-		}
 
 		// const w = new Writer(stream)
 		// await w.write(end) // send end group message in quic stream
