@@ -27,6 +27,7 @@ interface Group {
 	readyChunks: Channel<Uint8Array>
 	delete?: () => void
 	done: boolean
+	timeout?: NodeJS.Timeout
 }
 
 export class Objects {
@@ -328,6 +329,11 @@ export class Objects {
 							group.chunks?.set(sequenceNum, datagrams)
 						}
 						datagrams.push({ number: sliceNum, data: data })
+						if (group.timeout) clearTimeout(group.timeout) // clear group chunks' queue closure timeout
+						group.timeout = setTimeout(() => {
+							group.done = true // set group state to done
+							void group.readyChunks.push(new Uint8Array(), true) // close ready chunks queue
+						}, 2000) // timer that closes the ready chunks queue after time has elapsed with no new datagrams for this group
 					} else if (splitData.length == 5) {
 						const trackId = Number(splitData.shift()).toString() // decode track id
 						const groupId = Number(splitData.shift()) // decode group id number
@@ -389,6 +395,11 @@ export class Objects {
 												)
 										}
 										chunks.delete(sequenceNum) // delete entry from incoming chunks
+										if (group.timeout) clearTimeout(group.timeout) // clear group chunks' queue closure timeout
+										group.timeout = setTimeout(() => {
+											group.done = true // set group state to done
+											void group.readyChunks.push(new Uint8Array(), true) // close ready chunks queue
+										}, 2000) // timer that closes the ready chunks queue after time has elapsed with no new datagrams for this group
 									}
 								}
 							} else {
@@ -411,6 +422,7 @@ export class Objects {
 
 						// received end message ?
 						if (group && msg == "end") {
+							if (group.timeout) clearTimeout(group.timeout) // clear group chunks' queue closure timeout
 							group.done = true // set group state to done
 							void group.readyChunks.push(new Uint8Array(), true) // close ready chunks queue
 						}
