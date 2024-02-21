@@ -94,6 +94,7 @@ export class Objects {
 					})
 				}
 
+				// eslint-disable-next-line no-constant-condition
 				if (datagramMode) {
 					// chunk is sent as quic datagram
 					const data = chunk as Uint8Array
@@ -123,12 +124,16 @@ export class Objects {
 			},
 		})
 
-		const end = new TextEncoder().encode(
-			`${header.track} ${header.group} end`, // end group message format: trackId GroupId 'end'
-		)
+		if (datagramMode) {
+			const end = new TextEncoder().encode(
+				`${header.track} ${header.group} end`, // end group message format: trackId GroupId 'end'
+			)
 
-		const w = new Writer(stream)
-		await w.write(end) // send end group message in quic stream
+			await sendDatagram(end)
+		}
+
+		// const w = new Writer(stream)
+		// await w.write(end) // send end group message in quic stream
 
 		tstream.readable.pipeThrough({ writable: stream, readable: tstream.readable })
 		return tstream.writable
