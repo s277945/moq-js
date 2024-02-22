@@ -36,6 +36,7 @@ export class Objects {
 	private datagramMode?: boolean
 	private chunksMap: Map<string, Map<number, Group>>
 	private mutex: Mutex
+	private writer?: WritableStreamDefaultWriter<any>
 
 	constructor(quic: WebTransport, datagramMode?: boolean) {
 		this.quic = quic
@@ -46,9 +47,9 @@ export class Objects {
 	}
 
 	async sendDatagram(datagram: Uint8Array) {
-		const w = this.quic.datagrams.writable.getWriter() // get quic instance datagrams writer
-		await w.write(datagram) // send datagram to quic
-		w.releaseLock() // release writer
+		if (!this.writer) this.writer = this.quic.datagrams.writable.getWriter() // get quic instance datagrams writer
+		// const w = this.quic.datagrams.writable.getWriter() // get quic instance datagrams writer
+		await this.writer.write(datagram) // send datagram to quic
 	}
 
 	async send(header: Header): Promise<WritableStream<Uint8Array>> {
