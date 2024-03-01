@@ -295,13 +295,19 @@ export class Objects {
 					const splitData = utf.split(" ") // split object fields
 
 					if (splitData.length > 5) {
+						let header = ""
+						for (let i = 0; i < 5; i++) {
+							header += splitData[i] + " "
+						}
+						const offset = new TextEncoder().encode(header).length // get data start offset from header length
 						const trackId = Number(splitData.shift()).toString() // decode track id
 						const groupId = Number(splitData.shift()) // decode group id number
 						const sequenceNum = Number(splitData.shift()) // decode object sequence number
 						const sliceNum = Number(splitData.shift()) // decode slice number
 						const sliceLen = Number(splitData.shift()) // decode slice number
-						const data = res.subarray(43, res.length) // extract data
+						const data = res.subarray(offset, res.length) // extract data
 						// console.log(data)
+						// console.log(sliceLen, offset)
 						await this.mutex.acquire() // start atomic operation on chunksMap
 						let track = this.chunksMap.get(trackId) // get track chunks map
 						if (!track) {
