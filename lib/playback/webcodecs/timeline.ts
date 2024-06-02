@@ -95,7 +95,9 @@ export class Component {
 							value.sequence +
 							" of track " +
 							BigInt(value.track).toString() +
-							" : too old",
+							" : too old" +
+							", current segment is " +
+							this.#current.sequence,
 					)
 					continue
 				} else {
@@ -112,7 +114,10 @@ export class Component {
 							this.#current.sequence +
 							" of track " +
 							BigInt(this.#current.track).toString() +
-							" : too old",
+							" : too slow" +
+							", new segment " +
+							value.sequence +
+							" is available",
 					)
 				}
 			}
