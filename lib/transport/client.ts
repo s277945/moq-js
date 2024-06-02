@@ -31,7 +31,7 @@ export class Client {
 
 	async connect(): Promise<Connection> {
 		// Helper function to make creating a promise easier
-		const options: WebTransportOptions = {}
+		const options: WebTransportOptions = { congestionControl: "low-latency" }
 
 		const fingerprint = await this.#fingerprint
 		if (fingerprint) options.serverCertificateHashes = [fingerprint]

@@ -296,9 +296,7 @@ export class Objects {
 
 					if (splitData.length > 5) {
 						let header = ""
-						for (let i = 0; i < 5; i++) {
-							header += splitData[i] + " "
-						}
+						for (let i = 0; i < 5; i++) header += splitData[i] + " " // recompose header string
 						const offset = new TextEncoder().encode(header).length // get data start offset from header length
 						const trackId = Number(splitData.shift()).toString() // decode track id
 						const groupId = Number(splitData.shift()) // decode group id number
